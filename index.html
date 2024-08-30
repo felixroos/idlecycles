@@ -159,7 +159,7 @@
       canvas.height = canvas.clientHeight * window.devicePixelRatio;
 
       const ctx = canvas.getContext("2d");
-      function draw(pat, cycles = 1) {
+      function draw(pat, cycles = 4) {
         const { width, height } = ctx.canvas;
         ctx.fillStyle = "lightgray";
         ctx.fillRect(0, 0, width, height);
@@ -207,7 +207,7 @@
         console.log("code", code);
         const pat = new Function(`return ${code}`)();
         console.log("pat", pat);
-        draw(pat, 1);
+        draw(pat, 4);
 
         console.log("code", code);
         window.location.hash = "#" + code2hash(code);
