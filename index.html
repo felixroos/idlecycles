@@ -60,7 +60,7 @@
         return pure(value);
       };
 
-      let joinLeft = (left, right, fn) => (a, b) => {
+      let joinLeft = (fn, left, right) => (a, b) => {
         const l = left(a, b);
         let bag = [];
         for (let i in l) {
@@ -71,7 +71,6 @@
         }
         return bag;
       };
-      let joinRight = (left, right, fn) => joinLeft(right, left, fn);
 
       // squeeze one cycle of right into each event of left
       let joinSqueezeRight = (left, right, fn) => (a, b) => {
@@ -95,6 +94,9 @@
 
       let register = (name, fn) => {
         Pattern.prototype[name] = function (...args) {
+          for (let i in args) {
+            console.log("arg", args[i]);
+          }
           return fn(...args, this);
         };
         return (...args) => fn(...args);
@@ -111,8 +113,7 @@
         collect((cycle) => {
           return values.reduce((acc, v) => {
             let pat = reify(v);
-            let cycle = pat.query(cycle, cycle + 1);
-            return acc.concat(cycle);
+            return acc.concat(pat.query(cycle, cycle + 1));
           }, []);
         })
       );
