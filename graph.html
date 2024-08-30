@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html style="height: 100vh">
+  <head>
+    <title>idlecycles</title>
+  </head>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      display: flex;
+      background: darkslateblue;
+    "
+  >
+    <canvas
+      id="canvas"
+      style="width: 100%; height: 100%; position: fixed; pointer-events: none"
+    ></canvas>
+    <textarea
+      id="code"
+      spellcheck="false"
+      style="
+        width: 100%;
+        z-index: 1;
+        font-size: 24px;
+        color: white;
+        background: transparent;
+        border: 0;
+        outline: none;
+        padding: 10px;
+      "
+    ></textarea>
+    <script>
+      // graph lib
+      class Node {
+        constructor(type, ins) {
+          this.type = type;
+          this.ins = ins;
+        }
+        update() {
+          throw new Error(`${this.type}.update not implemented`);
+        }
+        compileSelf(nodeId, args) {
+          return `const ${nodeId} = nodes['${nodeId}'].update(${args.join(
+            ","
+          )}); // ${this.type}`;
+        }
+      }
+      let register = (type, nodeClass = Node) => {
+        Node.prototype[type] = function (...args) {
+          return new nodeClass(type, [this, ...args]);
+        };
+        return (...args) => new nodeClass(type, args);
+      };
+      let registerRaw = (type, fn) => {
+        Node.prototype[type] = function (...args) {
+          return fn(this, ...args);
+        };
+        return fn;
+      };
+      Node.prototype.compile = function () {
+        const graph = this;
+        const sorted = [];
+        let code = "";
+        const nodes = {};
+        const getId = (input) =>
+          ["number", "string"].includes(typeof input)
+            ? input
+            : `n${sorted.indexOf(input)}`;
+        const visited = new Set();
+        function dfs(node) {
+          if (typeof node !== "object" || visited.has(node)) {
+            return;
+          }
+          visited.add(node);
+          for (let i in node.ins) {
+            dfs(node.ins[i]);
+          }
+          sorted.push(node);
+          const nodeId = getId(node);
+          nodes[nodeId] = node;
+          const args = node.ins.map(getId);
+          code += `\n${node.compileSelf(nodeId, args)}`;
+        }
+        dfs(graph);
+        code += `\nreturn ${getId(graph)}`;
+        return { code, nodes };
+      };
+
+      // wip graph implementation of tidal
+      Node.prototype.out = function () {
+        const { code, nodes } = this.compile();
+        console.log(code, nodes);
+
+        const query = new Function("nodes", "span", code);
+        const res = query(nodes, [0, 1]);
+        console.log("res", res);
+      };
+      let _cat = register(
+        "_cat",
+        class extends Node {
+          update = ([a, b], ...steps) => {
+            // expand span to whole number range
+            a = Math.floor(a);
+            b = Math.ceil(b);
+            let events = [];
+            // iterate cycles
+            while (a < b) {
+              const step = steps[a % steps.length];
+              events.push({ value: step, a, b: a + 1 });
+              a++;
+            }
+            return events;
+          };
+        }
+      );
+      let cat = registerRaw("cat", (...steps) => _cat(span, ...steps));
+
+      // seq = cat * steps.length, where args = [span, ...steps]
+      let seq = registerRaw("seq", (...args) => cat(...args).fast(args.length));
+
+      let dfs = (node, fn, visited = []) => {
+        node = fn(node, visited);
+        visited.push(node);
+        node.ins = node.ins.map((input) => {
+          if (["number", "string"].includes(typeof input)) {
+            return input;
+          }
+          if (visited.includes(input)) {
+            return input;
+          }
+          return dfs(input, fn, visited);
+        });
+        return node;
+      };
+
+      // this node represents the query input timespan
+      const _span = register(
+        "_span",
+        class extends Node {
+          compileSelf = (id, args) => `const ${id} = span;`;
+        }
+      );
+
+      // takes a node and applies spanFn to all _span nodes up the graph
+      // hapFn will be applied to the hap result of each span consuming node
+      function editSpan(input, spanFn, hapFn) {
+        // we need to edit all _span nodes in all parents
+        input = dfs(input, (node, visited) => {
+          if (node.ins[0]?.type === "_span") {
+            node.ins[0] = spanFn(node.ins[0]);
+            visited.push(node.ins[0]); // prevents inifinite loop
+          }
+          return node;
+        });
+        return hapFn(input);
+      }
+
+      // multiplies span by given factor
+      let _scaleSpan = register(
+        "_scaleSpan",
+        class extends Node {
+          update = (span, factor) => [span[0] * factor, span[1] * factor];
+        }
+      );
+      // multiplies span by given factor
+      let _scaleHaps = register(
+        "_scaleHaps",
+        class extends Node {
+          update = (haps, factor) => {
+            for (let i in haps) {
+              haps[i].a *= factor;
+              haps[i].b *= factor;
+            }
+            return haps;
+          };
+        }
+      );
+
+      let fast = registerRaw("fast", (node, factor) =>
+        editSpan(
+          node,
+          (node) => _scaleSpan(node, factor), // scale up span
+          (node) => _scaleHaps(node, 1 / factor) // scale down haps
+        )
+      );
+
+      let slow = registerRaw("slow", (node, factor) =>
+        editSpan(
+          node,
+          (node) => _scaleSpan(node, 1 / factor), // scale down span
+          (node) => _scaleHaps(node, factor) // scale up haps
+        )
+      );
+      const span = _span();
+
+      // draw code
+
+      const canvas = document.getElementById("canvas");
+      canvas.width = canvas.clientWidth * window.devicePixelRatio;
+      canvas.height = canvas.clientHeight * window.devicePixelRatio;
+
+      const ctx = canvas.getContext("2d");
+      function draw(pat, cycles = 1) {
+        const { width, height } = ctx.canvas;
+        ctx.fillStyle = "lightgray";
+        ctx.fillRect(0, 0, width, height);
+        const x = (normalized) => normalized * width;
+        const y = (normalized) => normalized * height;
+        pat(0, cycles).forEach(({ begin, end, value }) => {
+          const [nx, nw] = [begin, end - begin];
+          const [ny, nh] = [Math.floor(begin) / cycles, height / cycles];
+          ctx.fillStyle = value;
+          const rect = [x(nx) % width, y(ny), x(nw), nh];
+          ctx.fillRect(...rect);
+        });
+      }
+
+      // tool code
+      console.log(
+        `Welcome to idlecycles.. this is still wip.
+      Read https://github.com/felixroos/idlecycles to find out more!
+        `
+      );
+      // control
+      let worklet,
+        hz = 44100;
+
+      let hash2code = (hash) => decodeURIComponent(atob(hash));
+      let code2hash = (code) => btoa(encodeURIComponent(code));
+
+      const update = async (code) => {
+        new Function(code)();
+        window.location.hash = "#" + code2hash(code);
+      };
+
+      // ui
+      const input = document.getElementById("code");
+      let urlCode = window.location.hash.slice(1);
+      if (urlCode) {
+        urlCode = hash2code(urlCode);
+        console.log("loaded code from url!");
+      }
+      const initialCode =
+        urlCode ||
+        `seq(1,2,3,4)
+.slow(2)
+.out()`;
+      input.value = initialCode;
+      update(initialCode);
+
+      input.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.altKey) && e.key === "Enter") {
+          update(input.value);
+        } /*  else if ((e.ctrlKey || e.altKey) && e.code === "Period") {
+          stop();
+          e.preventDefault();
+        } */
+      });
+    </script>
+  </body>
+</html>
