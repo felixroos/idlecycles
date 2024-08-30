@@ -93,30 +93,40 @@
         joinSqueezeRight(right, left, fn);
 
       let register = (name, fn) => {
+        /* const q = (...args) => {
+          return new Pattern((a, b) => {
+            const src = reify(args[args.length - 1]).query(a, b);
+            for (let j in src) {
+              if (args[0] instanceof Pattern) {
+                console.log("value", src[j].value);
+                const match = args[0].query(src[j].begin, src[j].end)[0].value;
+                console.log("match", match);
+              }
+            }
+            return fn(...args).query(a, b);
+          });
+        }; */
+        const q = fn;
         Pattern.prototype[name] = function (...args) {
-          for (let i in args) {
-            console.log("arg", args[i]);
-          }
-          return fn(...args, this);
+          return q(...args, this);
         };
-        return (...args) => fn(...args);
+        return q;
       };
 
       // lib
-      const cat = register("cat", (...values) =>
+      const cat = (...values) =>
         collect((cycle) => {
           let pat = reify(values[cycle % values.length]);
           return pat.query(cycle, cycle + 1);
-        })
-      );
-      const stack = register("stack", (...values) =>
+        });
+
+      const stack = (...values) =>
         collect((cycle) => {
           return values.reduce((acc, v) => {
             let pat = reify(v);
             return acc.concat(pat.query(cycle, cycle + 1));
           }, []);
-        })
-      );
+        });
 
       const fast = register(
         "fast",
@@ -180,15 +190,14 @@
       let code2hash = (code) => btoa(encodeURIComponent(code));
 
       const update = async (code) => {
-        console.log("go", code);
+        console.log("update:");
+        console.log(code);
         /* ac = ac || new AudioContext();
         await ac.resume();
         stop(); */
-        console.log("code", code);
         const pat = new Function(`return ${code}`)();
         draw(pat);
 
-        console.log("code", code);
         window.location.hash = "#" + code2hash(code);
       };
 
