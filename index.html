@@ -31,93 +31,34 @@
         padding: 10px;
       "
     ></textarea>
-    <button
-      style="position: fixed; right: 0; bottom: 0; font-size: 30px"
-      id="playButton"
-    >
-      play
-    </button>
-    <button
-      style="
-        display: none;
-        position: fixed;
-        right: 0;
-        bottom: 0;
-        font-size: 30px;
-      "
-      id="stopButton"
-    >
-      stop
-    </button>
     <script>
       // lib
-      // Hap<T> = { begin: number, end: number, value: T }
-      // (a: number, b: number, callback: (cycle: number) => Hap[]) => Hap[]
-      const collect = (a, b, callback) => {
-        let events = [];
-        while (a < b) {
-          events = events.concat(callback(a));
-          a++;
+      class Pattern {
+        constructor(query) {
+          this.query = query;
         }
-        return events;
-      };
-      const collectWholes = (a, b, callback) =>
-        collect(Math.floor(a), Math.ceil(b), callback);
+      }
+      const collect = (callback) =>
+        new Pattern((a, b) => {
+          let events = [];
+          a = Math.floor(a);
+          b = Math.ceil(b);
+          while (a < b) {
+            events = events.concat(callback(a));
+            a++;
+          }
+          return events;
+        });
 
-      // Pattern<T> = (a: number, b: number) => Hap<T>[]
+      const pure = (value) =>
+        collect((cycle) => [{ begin: cycle, end: cycle + 1, value }]);
 
-      // (T) => Pattern<T>
-      const pure = (value) => (a, b) =>
-        collect(a, b, (index) => [{ begin: index, end: index + 1, value }]);
-
-      // MaybePattern<T> = T | Pattern<T>
-      // MaybePattern<T> => Pattern<T>
       const reify = (value) => {
-        if (typeof value !== "function") {
-          return pure(value);
+        if (value instanceof Pattern) {
+          return value;
         }
-        return value;
+        return pure(value);
       };
-
-      // (...MaybePattern<T>) => Pattern<T>
-      const cat =
-        (...values) =>
-        (a, b) =>
-          collectWholes(a, b, (index) => {
-            let value = reify(values[index % values.length]);
-            return value(index, index + 1);
-          });
-
-      // (...MaybePattern<T>) => Pattern<T>
-      const stack =
-        (...values) =>
-        (a, b) =>
-          collect(a, b, (index) => {
-            return values.reduce((acc, v) => {
-              let value = reify(v);
-              let cycle = value(index, index + 1);
-              return acc.concat(cycle);
-            }, []);
-          });
-
-      // (number, MaybePattern<T>) => Pattern<T>
-      const fast = (fac, pat) => (a, b) =>
-        reify(pat)(a * fac, b * fac).map(({ begin, end, ...rest }) => ({
-          begin: begin / fac,
-          end: end / fac,
-          ...rest,
-        }));
-
-      // (number, MaybePattern<T>) => Pattern<T>
-      const slow = (fac, pat) => (a, b) =>
-        reify(pat)(a / fac, b / fac).map(({ begin, end, ...rest }) => ({
-          begin: begin * fac,
-          end: end * fac,
-          ...rest,
-        }));
-
-      // (...MaybePattern<T>) => Pattern<T>
-      const seq = (...values) => fast(values.length, cat(...values));
 
       let joinLeft = (left, right, fn) => (a, b) => {
         const l = left(a, b);
@@ -152,6 +93,44 @@
       let joinSqueezeLeft = (left, right, fn) =>
         joinSqueezeRight(right, left, fn);
 
+      let register = (name, fn) => {
+        Pattern.prototype[name] = function (...args) {
+          return fn(...args, this);
+        };
+        return (...args) => fn(...args);
+      };
+
+      // lib
+      const cat = register("cat", (...values) =>
+        collect((cycle) => {
+          let pat = reify(values[cycle % values.length]);
+          return pat.query(cycle, cycle + 1);
+        })
+      );
+      const stack = register("stack", (...values) =>
+        collect((cycle) => {
+          return values.reduce((acc, v) => {
+            let pat = reify(v);
+            let cycle = pat.query(cycle, cycle + 1);
+            return acc.concat(cycle);
+          }, []);
+        })
+      );
+
+      const fast = register(
+        "fast",
+        (fac, pat) =>
+          new Pattern((a, b) =>
+            pat.query(a * fac, b * fac).map(({ begin, end, ...rest }) => ({
+              begin: begin / fac,
+              end: end / fac,
+              ...rest,
+            }))
+          )
+      );
+      const slow = register("slow", (fac, pat) => fast(1 / fac, pat));
+
+      const seq = (...values) => fast(values.length, cat(...values));
       // draw code
 
       const canvas = document.getElementById("canvas");
@@ -159,13 +138,15 @@
       canvas.height = canvas.clientHeight * window.devicePixelRatio;
 
       const ctx = canvas.getContext("2d");
-      function draw(pat, cycles = 4) {
+      function draw(pat, cycles = 16) {
         const { width, height } = ctx.canvas;
         ctx.fillStyle = "lightgray";
         ctx.fillRect(0, 0, width, height);
         const x = (normalized) => normalized * width;
         const y = (normalized) => normalized * height;
-        pat(0, cycles).forEach(({ begin, end, value }) => {
+        console.log("pat", pat);
+        const haps = pat.query(0, cycles);
+        haps.forEach(({ begin, end, value }) => {
           const [nx, nw] = [begin, end - begin];
           const [ny, nh] = [Math.floor(begin) / cycles, height / cycles];
           ctx.fillStyle = value;
@@ -192,8 +173,6 @@
         hz = 44100;
       const stop = async () => {
         //
-        stopButton.style.display = "none";
-        playButton.style.display = "block";
       };
 
       let hash2code = (hash) => decodeURIComponent(atob(hash));
@@ -206,19 +185,14 @@
         stop(); */
         console.log("code", code);
         const pat = new Function(`return ${code}`)();
-        console.log("pat", pat);
-        draw(pat, 4);
+        draw(pat);
 
         console.log("code", code);
         window.location.hash = "#" + code2hash(code);
-        stopButton.style.display = "block";
-        playButton.style.display = "none";
       };
 
       // ui
       const input = document.getElementById("code");
-      const playButton = document.getElementById("playButton");
-      const stopButton = document.getElementById("stopButton");
       let urlCode = window.location.hash.slice(1);
       if (urlCode) {
         urlCode = hash2code(urlCode);
@@ -236,9 +210,6 @@
           e.preventDefault();
         }
       });
-
-      playButton.addEventListener("click", () => update(input.value));
-      stopButton.addEventListener("click", () => stop());
     </script>
   </body>
 </html>
