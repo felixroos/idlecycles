@@ -42,9 +42,9 @@
           throw new Error(`${this.type}.update not implemented`);
         }
         compileSelf(nodeId, args) {
-          return `const ${nodeId} = nodes['${nodeId}'].update(${args.join(
-            ","
-          )}); // ${this.type}`;
+          const arglist = args.join(",");
+          return `const ${nodeId} = scope.${this.type}(${args.join(", ")});`;
+          // return `const ${nodeId} = nodes['${nodeId}'].update(${arglist}); // ${this.type}`;
         }
       }
       let register = (type, nodeClass = Node) => {
@@ -88,34 +88,49 @@
         return { code, nodes };
       };
 
+      let scope = {
+        _scaleSpan: (span, factor) => [span[0] * factor, span[1] * factor],
+        _scaleHaps: (haps, factor) => {
+          for (let i in haps) {
+            haps[i].a *= factor;
+            haps[i].b *= factor;
+          }
+          return haps;
+        },
+        _cat: ([a, b], ...steps) => {
+          // expand span to whole number range
+          a = Math.floor(a);
+          b = Math.ceil(b);
+          let events = [];
+          // iterate cycles
+          while (a < b) {
+            const step = steps[a % steps.length];
+            events.push({ value: step, a, b: a + 1 });
+            a++;
+          }
+          return events;
+        },
+      };
+
       // wip graph implementation of tidal
       Node.prototype.out = function () {
+        console.log("out", this);
         const { code, nodes } = this.compile();
-        console.log(code, nodes);
-
-        const query = new Function("nodes", "span", code);
-        const res = query(nodes, [0, 1]);
+        console.log(code);
+        const query = new Function("nodes", "span", "scope", code);
+        const res = query(nodes, [0, 1], scope);
         console.log("res", res);
       };
-      let _cat = register(
-        "_cat",
+      let _cat = register("_cat");
+      let cat = registerRaw("cat", (...steps) => _cat(span, ...steps));
+
+      // this node represents the query input timespan
+      const _span = register(
+        "_span",
         class extends Node {
-          update = ([a, b], ...steps) => {
-            // expand span to whole number range
-            a = Math.floor(a);
-            b = Math.ceil(b);
-            let events = [];
-            // iterate cycles
-            while (a < b) {
-              const step = steps[a % steps.length];
-              events.push({ value: step, a, b: a + 1 });
-              a++;
-            }
-            return events;
-          };
+          compileSelf = (id, args) => `const ${id} = span;`;
         }
       );
-      let cat = registerRaw("cat", (...steps) => _cat(span, ...steps));
 
       // seq = cat * steps.length, where args = [span, ...steps]
       let seq = registerRaw("seq", (...args) => cat(...args).fast(args.length));
@@ -135,14 +150,6 @@
         return node;
       };
 
-      // this node represents the query input timespan
-      const _span = register(
-        "_span",
-        class extends Node {
-          compileSelf = (id, args) => `const ${id} = span;`;
-        }
-      );
-
       // takes a node and applies spanFn to all _span nodes up the graph
       // hapFn will be applied to the hap result of each span consuming node
       function editSpan(input, spanFn, hapFn) {
@@ -158,25 +165,9 @@
       }
 
       // multiplies span by given factor
-      let _scaleSpan = register(
-        "_scaleSpan",
-        class extends Node {
-          update = (span, factor) => [span[0] * factor, span[1] * factor];
-        }
-      );
+      let _scaleSpan = register("_scaleSpan");
       // multiplies span by given factor
-      let _scaleHaps = register(
-        "_scaleHaps",
-        class extends Node {
-          update = (haps, factor) => {
-            for (let i in haps) {
-              haps[i].a *= factor;
-              haps[i].b *= factor;
-            }
-            return haps;
-          };
-        }
-      );
+      let _scaleHaps = register("_scaleHaps");
 
       let fast = registerRaw("fast", (node, factor) =>
         editSpan(
