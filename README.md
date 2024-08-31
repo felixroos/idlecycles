@@ -118,18 +118,18 @@ The implementation looks very similar to `repeat`, maybe we should generalize th
 let cycle = (callback) => (a, b) => {
   let bag = [];
   while (a < b) {
-    bag = bag.concat(callback(a));
+    bag = bag.concat(callback(a, a + 1));
     a++;
   }
   return bag;
 };
 
-let repeat = (value) => cycle((a) => [{ a, b: a + 1, value }]);
+let repeat = (value) => cycle((a, b) => [{ a, b, value }]);
 
 let cat = (...values) =>
-  cycle((a) => {
+  cycle((a, b) => {
     let value = values[a % values.length];
-    return [{ a, b: a + 1, value }];
+    return [{ a, b, value }];
   });
 ```
 
@@ -221,7 +221,7 @@ The `stack` function will place all values in the same timespan:
 
 ```js
 let stack = (...values) =>
-  cycle((a) => values.map((value) => ({ a, b: a + 1, value })));
+  cycle((a, b) => values.map((value) => ({ a, b, value })));
 ```
 
 Visually, we're in 2D, so stacked rectangles will end up in the same place.
@@ -243,14 +243,14 @@ We can fix it like this:
 
 ```js
 let cat = (...values) =>
-  cycle((a) => {
+  cycle((a, b) => {
     let value = values[a % values.length];
     // if we have a function, we'll assume it's a Pattern function
     if (typeof value === "function") {
-      return value(a, a + 1);
+      return value(a, b);
     }
     // if it's not a function we'll take it as before
-    return [{ a, b: a + 1, value }];
+    return [{ a, b, value }];
   });
 ```
 
@@ -278,5 +278,111 @@ Examples:
 - [stack](https://felixroos.github.io/idlecycles/learn/chapter2.html#c3RhY2soJyUyM2ZmZmYwMDUwJyUyQyUyMCclMjMwMGZmZmY1MCcp)
 - [cat with nested seq](https://felixroos.github.io/idlecycles/learn/chapter2.html#Y2F0KCdjeWFuJyUyQyUyMHNlcSgnbWFnZW50YSclMkMlMjAneWVsbG93Jykp)
 - [deeper nesting](https://felixroos.github.io/idlecycles/learn/chapter2.html#ZmFzdCgzJTJDJTBBJTIwY2F0KCUwQSUyMCUyMHNlcSglMjJjeWFuJTIyJTJDJTIwc2VxKCUyMm1hZ2VudGElMjIlMkMlMjAlMjJ5ZWxsb3clMjIpKSUyQyUwQSUyMCUyMHNlcSglMEElMjAlMjAlMjAlMjAlMjIlMjMwMGZmZmY1MCUyMiUyQyUwQSUyMCUyMCUyMCUyMCUyMiUyM2ZmZmYwMDUwJTIyJTJDJTBBJTIwJTIwJTIwJTIwc3RhY2soJTIyJTIzMDBmZmZmNTAlMjIlMkMlMjIlMjNmZmZmMDA1MCUyMiklMEElMjAlMjApJTBBJTIwKSUwQSk=)
+
+## Chapter 3: Language Improvements
+
+Let's improve the language a bit. In strudel you can write:
+
+```js
+cat("cyan", "magenta", "yellow").fast(2);
+// is equivalent to:
+fast(2, cat("cyan", "magenta", "yellow"));
+```
+
+In our little implementation, we can only write the second variant.
+To get to the first variant, `cat` needs to return an object, where `fast` is a property.
+
+### Pattern as a class
+
+We can refactor our existing code by introducing the `Pattern` class.
+
+```js
+class Pattern {
+  constructor(query) {
+    this.query = query;
+  }
+}
+// Pattern creation shortcut:
+let P = (q) => new Pattern(q);
+
+Pattern.prototype.fast = function (speed) {
+  return fast(speed, this);
+};
+
+Pattern.prototype.slow = function (speed) {
+  return slow(speed, this);
+};
+```
+
+This still won't work, because `fast` itself needs to return a `Pattern` instance + handle a `Pattern` as its input:
+
+```js
+let fast = (factor, pat) =>
+  // the P(...) wraps our query function in a Pattern
+  // + pat is now a Pattern, which has to queried by calling pat.query
+  P((a, b) =>
+    pat.query(a * factor, b * factor).map((hap) => ({
+      a: hap.a / factor,
+      b: hap.b / factor,
+      value: hap.value,
+    }))
+  );
+```
+
+We're almost there, now the last refactoring to do is to make sure all the other functions return a `Pattern` instance, so we can call `.fast` and `.slow` on them.
+Luckily, our `cycle` function is the only thing we need to touch:
+
+```js
+let cycle = (callback) =>
+  P((a, b) => {
+    // ^ the P(...) is new
+    let bag = [];
+    while (a < b) {
+      bag = bag.concat(callback(a, a + 1));
+      a++;
+    }
+    return bag;
+  });
+```
+
+Finally, we can do:
+
+![fastmethod](./img/fastmethod.png)
+
+### More Meta Programming
+
+We have added our `fast` and `slow` methods to a `Pattern` by defining a function on `Pattern.prototype`.
+Because we want to add many more functions that transform a `Pattern`, we can add a helper function to simplify that:
+
+```js
+let register = (name, fn) => {
+  Pattern.prototype[name] = function (...args) {
+    return fn(args, this);
+  };
+  return fn;
+};
+
+let fast = register("fast", (factor, pat) => /* ... */);
+let slow = register("slow", (factor, pat) => fast(1 / factor, pat));
+```
+
+This paves the way for a lot more functions to come!
+
+### lastOf / firstOf
+
+Last but not least, let's add another set of functions:
+
+```js
+let firstOf = register("firstOf", (n, fn, pat) =>
+  cycle((a, b) => (a % n === 0 ? fn(pat) : pat).query(a, b))
+);
+let lastOf = register("lastOf", (n, fn, pat) =>
+  cycle((a, b) => (a % n === n - 1 ? fn(pat) : pat).query(a, b))
+);
+```
+
+This allows us to conditionally apply a function every n cycles:
+
+![lastOf](./img/lastOf.png)
 
 ## To be continued

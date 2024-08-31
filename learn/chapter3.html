@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html style="height: 100vh">
+  <head>
+    <title>idlecycles chapter 1</title>
+  </head>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      display: flex;
+      background: darkslateblue;
+    "
+  >
+    <canvas
+      id="canvas"
+      style="width: 100%; height: 100%; position: fixed; pointer-events: none"
+    ></canvas>
+    <textarea
+      id="code"
+      spellcheck="false"
+      style="
+        width: 100%;
+        z-index: 1;
+        font-size: 24px;
+        color: black;
+        background: transparent;
+        border: 0;
+        outline: none;
+        padding: 10px;
+      "
+    ></textarea>
+    <script>
+      class Pattern {
+        constructor(query) {
+          this.query = query;
+        }
+      }
+      let P = (q) => new Pattern(q);
+
+      let cycle = (callback) =>
+        P((a, b) => {
+          let bag = [];
+          while (a < b) {
+            bag = bag.concat(callback(a, a + 1));
+            a++;
+          }
+          return bag;
+        });
+
+      let repeat = (value) => cycle((a, b) => [{ a, b, value }]);
+
+      let cat = (...values) =>
+        cycle((a, b) => {
+          let value = values[a % values.length];
+          if (typeof value === "function") {
+            return value(a, b);
+          }
+          return [{ a, b, value }];
+        });
+
+      let seq = (...values) => fast(values.length, cat(...values));
+
+      let stack = (...values) =>
+        cycle((a, b) => values.map((value) => ({ a, b, value })));
+
+      let register = (name, fn) => {
+        Pattern.prototype[name] = function (...args) {
+          return fn(...args, this);
+        };
+        return fn;
+      };
+
+      let fast = register("fast", (factor, pat) =>
+        P((a, b) =>
+          pat.query(a * factor, b * factor).map((hap) => ({
+            a: hap.a / factor,
+            b: hap.b / factor,
+            value: hap.value,
+          }))
+        )
+      );
+
+      let slow = register("slow", (factor, pat) => fast(1 / factor, pat));
+
+      let firstOf = register("firstOf", (n, fn, pat) =>
+        cycle((a, b) => (a % n === 0 ? fn(pat) : pat).query(a, b))
+      );
+      let lastOf = register("lastOf", (n, fn, pat) =>
+        cycle((a, b) => (a % n === n - 1 ? fn(pat) : pat).query(a, b))
+      );
+
+      // draw logic
+
+      const canvas = document.getElementById("canvas");
+      canvas.width = canvas.clientWidth * window.devicePixelRatio;
+      canvas.height = canvas.clientHeight * window.devicePixelRatio;
+
+      const ctx = canvas.getContext("2d");
+      function draw(pat, cycles = 16) {
+        const { width, height } = ctx.canvas;
+        ctx.fillStyle = "lightgray";
+        ctx.fillRect(0, 0, width, height);
+        const x = (normalized) => normalized * width;
+        const y = (normalized) => normalized * height;
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 6;
+        const haps = pat.query(0, cycles);
+        console.log("haps");
+        console.log(haps);
+        haps.forEach(({ a, b, value }) => {
+          const [nx, nw] = [a, b - a];
+          const [ny, nh] = [Math.floor(a) / cycles, height / cycles];
+          ctx.fillStyle = value;
+          const rect = [x(nx) % width, y(ny), x(nw), nh];
+          ctx.strokeRect(...rect);
+          ctx.fillRect(...rect);
+        });
+      }
+
+      // repl logic
+
+      let hash2code = (hash) => decodeURIComponent(atob(hash));
+      let code2hash = (code) => btoa(encodeURIComponent(code));
+
+      const update = async (code) => {
+        console.log("update:");
+        console.log(code);
+        const pat = new Function(`return ${code}`)();
+        draw(pat);
+        window.location.hash = "#" + code2hash(code);
+      };
+
+      const input = document.getElementById("code");
+      let urlCode = window.location.hash.slice(1);
+      if (urlCode) {
+        urlCode = hash2code(urlCode);
+        console.log("loaded code from url!");
+      }
+      const initialCode =
+        urlCode || `fast(5, cat('cyan', 'magenta', 'yellow'))`;
+      input.value = initialCode;
+      update(initialCode);
+
+      input.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.altKey) && e.key === "Enter") {
+          update(input.value);
+        }
+      });
+    </script>
+  </body>
+</html>
