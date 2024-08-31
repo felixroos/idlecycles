@@ -24,7 +24,7 @@ Disclaimer: This is not tidal, so take it with a grain of salt.
 The core primitive of tidal are Patterns, which are essentially functions of time:
 
 ```ts
-let silence (a, b) => [];
+let silence = (a, b) => [];
 silence(0, 1); // []
 silence(42, 79); // []
 ```
