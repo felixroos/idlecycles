@@ -137,7 +137,7 @@ With this, we could implement `repeat` and `cat` much more concise!
 
 ### Patterns as Functions of Space
 
-So far, I've talked about `a` and `b` as a _time_ span, but that's just a metaphor, because tidal is used for music.
+So far, I've talked about `a` and `b` as a _time_ span, but that's just a metaphor, because tidal is used for music (typically).
 But it's actually just a numerical range, so nothing stops us from interpreting Patterns as functions of space:
 
 ![cat](./img/cat.png)
@@ -349,6 +349,22 @@ Finally, we can do:
 
 ![fastmethod](./img/fastmethod.png)
 
+We need another little fix for nested Patterns:
+
+```js
+let cat = (...values) =>
+  cycle((a, b) => {
+    let value = values[a % values.length];
+    if (value instanceof Pattern) {
+      // ^ now we check if value is a Pattern instance
+      return value.query(a, b);
+    }
+    return [{ a, b, value }];
+  });
+```
+
+Before we were checking for value being a function..
+
 ### More Meta Programming
 
 We have added our `fast` and `slow` methods to a `Pattern` by defining a function on `Pattern.prototype`.
@@ -384,5 +400,15 @@ let lastOf = register("lastOf", (n, fn, pat) =>
 This allows us to conditionally apply a function every n cycles:
 
 ![lastOf](./img/lastOf.png)
+
+### Chapter 3 REPL
+
+This is the end of the third chapter!
+
+Open [chapter3.html](https://felixroos.github.io/idlecycles/learn/chapter2.html) to play with the new syntax. You can evaluate the code with `ctrl+enter` to see the visualization in action!
+
+Examples
+
+- [fast as a method](https://felixroos.github.io/idlecycles/learn/chapter3.html#Y2F0KCdjeWFuJyUyQyUyMCdtYWdlbnRhJyUyQyUyMCd5ZWxsb3cnKSUwQS5mYXN0KDUp)
 
 ## To be continued
