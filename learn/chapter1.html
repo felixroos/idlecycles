@@ -37,16 +37,16 @@
       let cycle = (callback) => (a, b) => {
         let bag = [];
         while (a < b) {
-          bag = bag.concat(callback(a));
+          bag = bag.concat(callback(a, a + 1));
           a++;
         }
         return bag;
       };
-      let repeat = (value) => cycle((a) => [{ a, b: a + 1, value }]);
+      let repeat = (value) => cycle((a, b) => [{ a, b, value }]);
       let cat = (...values) =>
-        cycle((a) => {
+        cycle((a, b) => {
           let value = values[a % values.length];
-          return [{ a, b: a + 1, value }];
+          return [{ a, b, value }];
         });
 
       // draw logic

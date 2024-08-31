@@ -32,26 +32,26 @@
       "
     ></textarea>
     <script>
-      // chapter 2 logic:
+      // chapter 1 logic:
 
       let cycle = (callback) => (a, b) => {
         let bag = [];
         while (a < b) {
-          bag = bag.concat(callback(a));
+          bag = bag.concat(callback(a, a + 1));
           a++;
         }
         return bag;
       };
-      let repeat = (value) => cycle((a) => [{ a, b: a + 1, value }]);
+      let repeat = (value) => cycle((a, b) => [{ a, b, value }]);
       let cat = (...values) =>
-        cycle((a) => {
+        cycle((a, b) => {
           let value = values[a % values.length];
           // if we have a function, we'll assume it's a Pattern function
           if (typeof value === "function") {
-            return value(a, a + 1);
+            return value(a, b);
           }
           // if it's not a function we'll take it as before
-          return [{ a, b: a + 1, value }];
+          return [{ a, b, value }];
         });
 
       // chapter 2 logic:
@@ -69,7 +69,7 @@
       let slow = (factor, pat) => fast(1 / factor, pat);
       let seq = (...values) => fast(values.length, cat(...values));
       let stack = (...values) =>
-        cycle((a) => values.map((value) => ({ a, b: a + 1, value })));
+        cycle((a, b) => values.map((value) => ({ a, b, value })));
 
       // draw logic
 
