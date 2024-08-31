@@ -19,7 +19,7 @@ I've created this repo to understand the core of tidal at a deeper level by re-i
 This part of the README will document my progress and could be helpful for people trying to understand tidal.
 Disclaimer: This is not tidal, so take it with a grain of salt.
 
-### Patterns as Functions of Time
+## Chapter 1: Patterns as Functions of Time
 
 The core primitive of tidal are Patterns, which are essentially functions of time:
 
@@ -89,4 +89,68 @@ declare type Pattern<T> = (a: number, b: number) => Hap<T>[];
 
 Note that these typings are only a simplified version of what strudel or tidal use, but it's enough to get started thinking about Patterns.
 
-### To be continued
+### Conc-_cat_-enation
+
+Our repeat function is still a bit boring.. How about switching between different values?
+
+```js
+let cat =
+  (...values) =>
+  (a, b) => {
+    let bag = [];
+    while (a < b) {
+      const value = a % values.length;
+      bag.push({ a, b: a + 1, value });
+      a++;
+    }
+    return bag;
+  };
+let pat = cat("snake", "dog");
+pat(0, 2); // [{a: 0, b: 1, value: 'snake'},{a: 1, b: 2, value: 'dog'}]
+pat(1, 3); // [{a: 1, b: 2, value: 'dog'}, {a: 2, b: 3, value: 'snake'}]
+```
+
+The above pattern gives us an infinite timeline of snakes and dogs!
+
+The implementation looks very similar to `repeat`, maybe we should generalize this loop:
+
+```js
+let cycle = (callback) => (a, b) => {
+  let bag = [];
+  while (a < b) {
+    bag = bag.concat(callback(a));
+    a++;
+  }
+  return bag;
+};
+
+let repeat = (value) => cycle((a) => [{ a, b: a + 1, value }]);
+
+let cat = (...values) =>
+  cycle((a) => {
+    let value = values[a % values.length];
+    return [{ a, b: a + 1, value }];
+  });
+```
+
+With this, we could implement `repeat` and `cat` much more concise!
+
+### Patterns as Functions of Space
+
+So far, I've talked about `a` and `b` as a _time_ span, but that's just a metaphor, because tidal is used for music.
+But it's actually just a numerical range, so nothing stops us from interpreting Patterns as functions of space:
+
+![cat](./img/cat.png)
+
+In this other kind of cat picture, we see each whole number cycle represented as a line, and the value of each `Hap` is interpreted as a color.
+
+From now on, I'll use this type of visualization, as it makes more sense in a written guide.
+
+### End of Chapter 1
+
+This is the end of the first chapter!
+I've decided to create a separate HTML file with the code for each chapter including a minimal REPL for you to play around with.
+
+Open [chapter1.html](./learn/chapter1.html) to play with `cat` and `repeat`. You can evaluate the code with `ctrl+enter` to see the visualization in action!
+
+## To be continued

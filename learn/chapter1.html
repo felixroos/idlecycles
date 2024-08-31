@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html style="height: 100vh">
+  <head>
+    <title>idlecycles chapter 1</title>
+  </head>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      display: flex;
+      background: darkslateblue;
+    "
+  >
+    <canvas
+      id="canvas"
+      style="width: 100%; height: 100%; position: fixed; pointer-events: none"
+    ></canvas>
+    <textarea
+      id="code"
+      spellcheck="false"
+      style="
+        width: 100%;
+        z-index: 1;
+        font-size: 24px;
+        color: black;
+        background: transparent;
+        border: 0;
+        outline: none;
+        padding: 10px;
+      "
+    ></textarea>
+    <script>
+      // chapter 1 logic:
+
+      let cycle = (callback) => (a, b) => {
+        let bag = [];
+        while (a < b) {
+          bag = bag.concat(callback(a));
+          a++;
+        }
+        return bag;
+      };
+      let repeat = (value) => cycle((a) => [{ a, b: a + 1, value }]);
+      let cat = (...values) =>
+        cycle((a) => {
+          let value = values[a % values.length];
+          return [{ a, b: a + 1, value }];
+        });
+
+      // draw logic
+
+      const canvas = document.getElementById("canvas");
+      canvas.width = canvas.clientWidth * window.devicePixelRatio;
+      canvas.height = canvas.clientHeight * window.devicePixelRatio;
+
+      const ctx = canvas.getContext("2d");
+      function draw(pat, cycles = 16) {
+        const { width, height } = ctx.canvas;
+        ctx.fillStyle = "lightgray";
+        ctx.fillRect(0, 0, width, height);
+        const x = (normalized) => normalized * width;
+        const y = (normalized) => normalized * height;
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 6;
+        const haps = pat(0, cycles);
+        haps.forEach(({ a, b, value }) => {
+          const [nx, nw] = [a, b - a];
+          const [ny, nh] = [Math.floor(a) / cycles, height / cycles];
+          ctx.fillStyle = value;
+          const rect = [x(nx) % width, y(ny), x(nw), nh];
+          ctx.strokeRect(...rect);
+          ctx.fillRect(...rect);
+        });
+      }
+
+      // repl logic
+
+      let hash2code = (hash) => decodeURIComponent(atob(hash));
+      let code2hash = (code) => btoa(encodeURIComponent(code));
+
+      const update = async (code) => {
+        console.log("update:");
+        console.log(code);
+        const pat = new Function(`return ${code}`)();
+        draw(pat);
+        window.location.hash = "#" + code2hash(code);
+      };
+
+      const input = document.getElementById("code");
+      let urlCode = window.location.hash.slice(1);
+      if (urlCode) {
+        urlCode = hash2code(urlCode);
+        console.log("loaded code from url!");
+      }
+      const initialCode = urlCode || `cat('cyan', 'magenta', 'yellow')`;
+      input.value = initialCode;
+      update(initialCode);
+
+      input.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.altKey) && e.key === "Enter") {
+          update(input.value);
+        }
+      });
+    </script>
+  </body>
+</html>
