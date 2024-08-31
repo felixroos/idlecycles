@@ -32,7 +32,7 @@
       "
     ></textarea>
     <script>
-      // chapter 1 logic:
+      // chapter 2 logic:
 
       let cycle = (callback) => (a, b) => {
         let bag = [];
@@ -46,8 +46,30 @@
       let cat = (...values) =>
         cycle((a) => {
           let value = values[a % values.length];
+          // if we have a function, we'll assume it's a Pattern function
+          if (typeof value === "function") {
+            return value(a, a + 1);
+          }
+          // if it's not a function we'll take it as before
           return [{ a, b: a + 1, value }];
         });
+
+      // chapter 2 logic:
+
+      let fast = (factor, pat) => (a, b) =>
+        pat(
+          a * factor, // scale up timespan
+          b * factor
+        ).map((hap) => ({
+          a: hap.a / factor, // scale down hap timespan
+          b: hap.b / factor,
+          value: hap.value,
+        }));
+
+      let slow = (factor, pat) => fast(1 / factor, pat);
+      let seq = (...values) => fast(values.length, cat(...values));
+      let stack = (...values) =>
+        cycle((a) => values.map((value) => ({ a, b: a + 1, value })));
 
       // draw logic
 
@@ -96,7 +118,8 @@
         urlCode = hash2code(urlCode);
         console.log("loaded code from url!");
       }
-      const initialCode = urlCode || `cat('cyan', 'magenta', 'yellow')`;
+      const initialCode =
+        urlCode || `fast(5, cat('cyan', 'magenta', 'yellow'))`;
       input.value = initialCode;
       update(initialCode);
 
