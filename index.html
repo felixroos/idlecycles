@@ -93,20 +93,35 @@
         joinSqueezeRight(right, left, fn);
 
       let register = (name, fn) => {
-        /* const q = (...args) => {
+        const q = (...args) => {
           return new Pattern((a, b) => {
-            const src = reify(args[args.length - 1]).query(a, b);
-            for (let j in src) {
-              if (args[0] instanceof Pattern) {
-                console.log("value", src[j].value);
-                const match = args[0].query(src[j].begin, src[j].end)[0].value;
-                console.log("match", match);
+            if (args[0] instanceof Pattern) {
+              let haps = [];
+              const src = reify(args[args.length - 1]).query(a, b);
+              for (let j in src) {
+                const hap = src[j];
+                const match = args[0].query(hap.begin, hap.end)[0].value;
+                const _args = [match, ...args.slice(1)];
+                const subhaps = fn(..._args).query(hap.begin, hap.end);
+                /*  console.log(
+                  name,
+                  match,
+                  ":",
+                  hap.begin,
+                  hap.end,
+                  "during",
+                  hap.value,
+                  "=",
+                  subhaps
+                ); */
+                haps = haps.concat(subhaps);
               }
+              return haps;
             }
             return fn(...args).query(a, b);
           });
-        }; */
-        const q = fn;
+        };
+        // const q = fn;
         Pattern.prototype[name] = function (...args) {
           return q(...args, this);
         };
@@ -155,13 +170,15 @@
         ctx.fillRect(0, 0, width, height);
         const x = (normalized) => normalized * width;
         const y = (normalized) => normalized * height;
-        console.log("pat", pat);
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 6;
         const haps = pat.query(0, cycles);
         haps.forEach(({ begin, end, value }) => {
           const [nx, nw] = [begin, end - begin];
           const [ny, nh] = [Math.floor(begin) / cycles, height / cycles];
           ctx.fillStyle = value;
           const rect = [x(nx) % width, y(ny), x(nw), nh];
+          ctx.strokeRect(...rect);
           ctx.fillRect(...rect);
         });
       }
