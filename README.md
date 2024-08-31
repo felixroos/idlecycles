@@ -151,7 +151,7 @@ From now on, I'll use this type of visualization, as it makes more sense in a wr
 This is the end of the first chapter!
 I've decided to create a separate HTML file with the code for each chapter including a minimal REPL for you to play around with.
 
-Open [chapter1.html](<[./learn/chapter1.html](https://felixroos.github.io/idlecycles/learn/chapter1.html)>) to play with `cat` and `repeat`. You can evaluate the code with `ctrl+enter` to see the visualization in action!
+Open [chapter1.html](https://felixroos.github.io/idlecycles/learn/chapter1.html) to play with `cat` and `repeat`. You can evaluate the code with `ctrl+enter` to see the visualization in action!
 
 Here are some examples:
 
