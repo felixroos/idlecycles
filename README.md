@@ -270,4 +270,13 @@ Open [chapter2.html](https://felixroos.github.io/idlecycles/learn/chapter2.html)
 
 With these new functions, we can already create some non-trivial patterns, but the syntax is still a bit unwieldy, as it's difficult to keep track of all the parens when nesting.. Luckily, there is a way out, which we'll implement in the next chapter!
 
+Examples:
+
+- [fast](https://felixroos.github.io/idlecycles/learn/chapter2.html#ZmFzdCg1JTJDJTIwY2F0KCdjeWFuJyUyQyUyMCdtYWdlbnRhJyUyQyUyMCd5ZWxsb3cnKSk=)
+- [slow](https://felixroos.github.io/idlecycles/learn/chapter2.html#c2xvdygyJTJDJTIwY2F0KCdjeWFuJyUyQyUyMCdtYWdlbnRhJyUyQyUyMCd5ZWxsb3cnKSk=)
+- [seq](https://felixroos.github.io/idlecycles/learn/chapter2.html#c2VxKCdjeWFuJyUyQyUyMCdtYWdlbnRhJyUyQyUyMCd5ZWxsb3cnKQ==)
+- [stack](https://felixroos.github.io/idlecycles/learn/chapter2.html#c3RhY2soJyUyM2ZmZmYwMDUwJyUyQyUyMCclMjMwMGZmZmY1MCcp)
+- [cat with nested seq](https://felixroos.github.io/idlecycles/learn/chapter2.html#Y2F0KCdjeWFuJyUyQyUyMHNlcSgnbWFnZW50YSclMkMlMjAneWVsbG93Jykp)
+- [deeper nesting](https://felixroos.github.io/idlecycles/learn/chapter2.html#ZmFzdCgzJTJDJTBBJTIwY2F0KCUwQSUyMCUyMHNlcSglMjJjeWFuJTIyJTJDJTIwc2VxKCUyMm1hZ2VudGElMjIlMkMlMjAlMjJ5ZWxsb3clMjIpKSUyQyUwQSUyMCUyMHNlcSglMEElMjAlMjAlMjAlMjAlMjIlMjMwMGZmZmY1MCUyMiUyQyUwQSUyMCUyMCUyMCUyMCUyMiUyM2ZmZmYwMDUwJTIyJTJDJTBBJTIwJTIwJTIwJTIwc3RhY2soJTIyJTIzMDBmZmZmNTAlMjIlMkMlMjIlMjNmZmZmMDA1MCUyMiklMEElMjAlMjApJTBBJTIwKSUwQSk=)
+
 ## To be continued
