@@ -40,9 +40,6 @@
         open_seq: /^\[/,
         close_seq: /^\]/,
         plain: /^[a-zA-Z0-9\.]+/,
-        /* integer: /^[0-9]+/,
-        decimal: /^[+-]?([0-9]*[.])?[0-9]+/,
-        string: /^[a-zA-Z0-9\.]+/, */
       };
       function next_token(code) {
         for (let type in token_types) {
@@ -81,9 +78,11 @@
           let next = this.tokens[0]?.type;
           if (next === "open_cat") {
             return this.parse_cat();
-          } else if (next === "open_seq") {
+          }
+          if (next === "open_seq") {
             return this.parse_seq();
-          } else if (next === "plain") {
+          }
+          if (next === "plain") {
             return this.consume("plain");
           }
           throw new Error(

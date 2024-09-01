@@ -1,6 +1,6 @@
-# idlecycles
+# IdleCycles
 
-just another single HTML live coding playground..
+A naive approach on TidalCycles, guided by learning.
 
 ## Examples
 
@@ -15,7 +15,7 @@ just another single HTML live coding playground..
 
 ## Tidal from Scratch
 
-I've created this repo to understand the core of tidal at a deeper level by re-implementing its core logic.
+I've created this repo to understand the core of [TidalCycles](https://tidalcycles.org/) at a deeper level by re-implementing its core logic.
 This part of the README will document my progress and could be helpful for people trying to understand tidal.
 Disclaimer: This is not tidal, so take it with a grain of salt.
 
@@ -518,7 +518,7 @@ Let's start by defining a Parser that is really dumb:
 
 ```js
 class Parser {
-  // take tokens, return tree
+  // take code, return tree
   parse(code) {
     this.tokens = tokenize(code);
     return this.parse_cat();
@@ -650,9 +650,11 @@ class Parser {
     let next = this.tokens[0]?.type;
     if (next === "open_cat") {
       return this.parse_cat();
-    } else if (next === "open_seq") {
+    }
+    if (next === "open_seq") {
       return this.parse_seq();
-    } else if (next === "plain") {
+    }
+    if (next === "plain") {
       return this.consume("plain");
     }
     throw new Error(`unexpected token "${this.tokens[0].value}"`);
