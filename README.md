@@ -1,6 +1,6 @@
 # IdleCycles
 
-A naive approach on TidalCycles, guided by learning.
+A naive take on TidalCycles in JS, guided by learning.
 
 ## Examples
 
