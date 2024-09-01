@@ -51,19 +51,23 @@
 
       let repeat = (value) => cycle((a, b) => [{ a, b, value }]);
 
+      let nest = (value, a, b) => {
+        if (value instanceof Pattern) {
+          return value.query(a, b);
+        }
+        return [{ a, b, value }];
+      };
+
       let cat = (...values) =>
         cycle((a, b) => {
           let value = values[a % values.length];
-          if (value instanceof Pattern) {
-            return value.query(a, b);
-          }
-          return [{ a, b, value }];
+          return nest(value, a, b);
         });
 
-      let seq = (...values) => fast(values.length, cat(...values));
-
       let stack = (...values) =>
-        cycle((a, b) => values.map((value) => ({ a, b, value })));
+        cycle((a, b) => values.map((value) => nest(value, a, b)).flat());
+
+      let seq = (...values) => fast(values.length, cat(...values));
 
       let register = (name, fn) => {
         Pattern.prototype[name] = function (...args) {

@@ -151,19 +151,25 @@
       let repeat = (value) => cycle((a, b) => [{ a, b, value }]);
       let reify = (value) => (value instanceof Pattern ? value : repeat(value));
 
+      let nest = (value, a, b) => {
+        // if we have a function, we'll assume it's a Pattern function
+        if (value instanceof Pattern) {
+          return value.query(a, b);
+        }
+        // if it's not a function we'll take it as before
+        return [{ a, b, value }];
+      };
+
       let cat = (...values) =>
         cycle((a, b) => {
           let value = values[a % values.length];
-          if (value instanceof Pattern) {
-            return value.query(a, b);
-          }
-          return [{ a, b, value }];
+          return nest(value, a, b);
         });
 
-      let seq = (...values) => fast(values.length, cat(...values));
-
       let stack = (...values) =>
-        cycle((a, b) => values.map((value) => ({ a, b, value })));
+        cycle((a, b) => values.map((value) => nest(value, a, b)).flat());
+
+      let seq = (...values) => fast(values.length, cat(...values));
 
       let register = (name, fn) => {
         Pattern.prototype[name] = function (...args) {

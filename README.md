@@ -249,16 +249,22 @@ If we do that, we only get cyan, because the second input of `cat` is not a colo
 We can fix it like this:
 
 ```js
+let nest = (value, a, b) => {
+  // if we have a function, we'll assume it's a Pattern function
+  if (typeof value === "function") {
+    return value(a, b);
+  }
+  // if it's not a function we'll take it as before
+  return [{ a, b, value }];
+};
 let cat = (...values) =>
   cycle((a, b) => {
     let value = values[a % values.length];
-    // if we have a function, we'll assume it's a Pattern function
-    if (typeof value === "function") {
-      return value(a, b);
-    }
-    // if it's not a function we'll take it as before
-    return [{ a, b, value }];
+    return nest(value, a, b);
   });
+
+let stack = (...values) =>
+  cycle((a, b) => values.map((value) => nest(value, a, b)).flat());
 ```
 
 Now if a value is a function, we'll call it with the current cycle, assuming it's a Pattern function, which allows us to nest:
@@ -359,18 +365,15 @@ Finally, we can do:
 We need another little fix for nested Patterns:
 
 ```js
-let cat = (...values) =>
-  cycle((a, b) => {
-    let value = values[a % values.length];
-    if (value instanceof Pattern) {
-      // ^ now we check if value is a Pattern instance
-      return value.query(a, b);
-    }
-    return [{ a, b, value }];
-  });
+let nest = (value, a, b) => {
+  if (value instanceof Pattern) {
+    return value.query(a, b);
+  }
+  return [{ a, b, value }];
+};
 ```
 
-Before we were checking for value being a function..
+Before we were checking for value being a function, now we have to check if it's a Pattern.
 
 ### More Meta Programming
 

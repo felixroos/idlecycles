@@ -150,20 +150,23 @@
         });
 
       let repeat = (value) => cycle((a, b) => [{ a, b, value }]);
+      let nest = (value, a, b) => {
+        if (value instanceof Pattern) {
+          return value.query(a, b);
+        }
+        return [{ a, b, value }];
+      };
 
       let cat = (...values) =>
         cycle((a, b) => {
           let value = values[a % values.length];
-          if (value instanceof Pattern) {
-            return value.query(a, b);
-          }
-          return [{ a, b, value }];
+          return nest(value, a, b);
         });
 
-      let seq = (...values) => fast(values.length, cat(...values));
-
       let stack = (...values) =>
-        cycle((a, b) => values.map((value) => ({ a, b, value })));
+        cycle((a, b) => values.map((value) => nest(value, a, b)).flat());
+
+      let seq = (...values) => fast(values.length, cat(...values));
 
       let register = (name, fn) => {
         let q = (...args) => {
@@ -234,6 +237,7 @@
       let s = control("s");
       let l = control("l");
       let a = control("a");
+      let size = control("size");
       // draw logic
 
       const canvas = document.getElementById("canvas");
@@ -250,11 +254,12 @@
         ctx.strokeStyle = "black";
         ctx.lineWidth = 6;
         const haps = pat.query(0, cycles);
-        console.log("haps");
         console.log(haps);
         haps.forEach(({ a, b, value }) => {
+          let size = 1;
           if (typeof value === "object") {
             let { color, h, s, l, a } = value;
+            size = value.size ?? 1;
             let fillStyle;
             if (color) {
               fillStyle = color;
@@ -275,10 +280,9 @@
             value = Number(value);
             ctx.fillStyle = `hsl(${value}turn 50% 50%)`;
           }
-
           const [nx, nw] = [a, b - a];
           const [ny, nh] = [Math.floor(a) / cycles, height / cycles];
-          const rect = [x(nx) % width, y(ny), x(nw), nh];
+          const rect = [x(nx) % width, y(ny), x(nw) * size, nh * size];
           ctx.strokeRect(...rect);
           ctx.fillRect(...rect);
         });
