@@ -19,6 +19,13 @@ I've created this repo to understand the core of [TidalCycles](https://tidalcycl
 This part of the README will document my progress and could be helpful for people trying to understand tidal.
 Disclaimer: This is not tidal, so take it with a grain of salt.
 
+### Table Of Contents
+
+1. [Patterns as Functions of Time](#chapter-1-patterns-as-functions-of-time)
+2. [Adding more Functions](#chapter-2-adding-more-functions)
+3. [Language Improvements](#chapter-3-language-improvements)
+4. [Mini Notation Parsing](#chapter-4-mini-notation-parsing)
+
 ## Chapter 1: Patterns as Functions of Time
 
 The core primitive of tidal are Patterns, which are essentially functions of time:
