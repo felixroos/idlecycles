@@ -66,8 +66,8 @@
       }
 
       class Parser {
-        parse(tokens) {
-          this.tokens = tokens;
+        parse(code) {
+          this.tokens = tokenize(code);
           return this.parse_expr();
         }
         consume(type) {
@@ -127,8 +127,7 @@
 
       const parser = new Parser();
       let mini = (code) => {
-        const tokens = tokenize(code);
-        const tree = parser.parse(tokens);
+        const tree = parser.parse(code);
         const pat = patternifyTree(tree);
         return reify(pat);
       };
@@ -239,7 +238,8 @@
         urlCode = hash2code(urlCode);
         console.log("loaded code from url!");
       }
-      const initialCode = urlCode || `mini("<cyan magenta yellow>").fast(5)`;
+      const initialCode =
+        urlCode || `mini("<cyan magenta [yellow white]>").fast(5)`;
       input.value = initialCode;
       update(initialCode);
 

@@ -519,8 +519,8 @@ Let's start by defining a Parser that is really dumb:
 ```js
 class Parser {
   // take tokens, return tree
-  parse(tokens) {
-    this.tokens = tokens;
+  parse(code) {
+    this.tokens = tokenize(code);
     return this.parse_cat();
   }
   // parse_cat (wip)
@@ -593,8 +593,8 @@ A similar function can be implemented for `seq`:
 ```js
 class Parser {
   /* .. */
-  parse(tokens) {
-    this.tokens = tokens;
+  parse(code) {
+    this.tokens = tokenize(code);
     return this.parse_seq();
   }
   parse_seq() {
@@ -607,6 +607,7 @@ class Parser {
     return { type: "seq", args };
   }
 }
+new Parser().parse("[cyan magenta white]");
 ```
 
 This smells like we could use an abstraction:
@@ -641,8 +642,8 @@ We can now tie both functions together with a function that can parse any expres
 ```js
 class Parser {
   /* .. */
-  parse(tokens) {
-    this.tokens = tokens;
+  parse(code) {
+    this.tokens = tokenize(code);
     return this.parse_expr();
   }
   parse_expr() {
@@ -695,8 +696,7 @@ This is all we need! Now we can tie the whole thing together and call it a day:
 ```js
 const parser = new Parser();
 let mini = (code) => {
-  const tokens = tokenize(code);
-  const tree = parser.parse(tokens);
+  const tree = parser.parse(code);
   const pat = patternifyTree(tree);
   if (pat instanceof Pattern) {
     return pat;
