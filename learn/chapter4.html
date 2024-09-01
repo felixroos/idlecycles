@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html style="height: 100vh">
   <head>
-    <title>idlecycles chapter 3</title>
+    <title>idlecycles chapter 4</title>
   </head>
   <body
     style="
@@ -32,6 +32,107 @@
       "
     ></textarea>
     <script>
+      // mini tokenizer / parser
+
+      let token_types = {
+        open_cat: /^\</,
+        close_cat: /^\>/,
+        open_seq: /^\[/,
+        close_seq: /^\]/,
+        plain: /^[a-zA-Z0-9\.]+/,
+        /* integer: /^[0-9]+/,
+        decimal: /^[+-]?([0-9]*[.])?[0-9]+/,
+        string: /^[a-zA-Z0-9\.]+/, */
+      };
+      function next_token(code) {
+        for (let type in token_types) {
+          const match = code.match(token_types[type]);
+          if (match) {
+            return { type, value: match[0] };
+          }
+        }
+        throw new Error(`could not match "${code}"`);
+      }
+      console.log(next_token("cyan magenta>")); //
+      function tokenize(code) {
+        let tokens = [];
+        while (code.length > 0) {
+          code = code.trim();
+          const token = next_token(code);
+          code = code.slice(token.value.length);
+          tokens.push(token);
+        }
+        return tokens;
+      }
+
+      class Parser {
+        parse(tokens) {
+          this.tokens = tokens;
+          return this.parse_expr();
+        }
+        consume(type) {
+          const token = this.tokens.shift();
+          if (token.type !== type) {
+            throw new Error(`expected token type ${type}, got ${token.type}`);
+          }
+          return token;
+        }
+        parse_expr() {
+          let next = this.tokens[0]?.type;
+          if (next === "open_cat") {
+            return this.parse_cat();
+          } else if (next === "open_seq") {
+            return this.parse_seq();
+          } else if (next === "plain") {
+            return this.consume("plain");
+          }
+          throw new Error(
+            `unexpected token "${this.tokens[0].value}" of type ${this.tokens[0].type}`
+          );
+        }
+        parse_args(close_type) {
+          const args = [];
+          while (this.tokens[0]?.type !== close_type) {
+            args.push(this.parse_expr());
+          }
+          return args;
+        }
+        parse_seq() {
+          this.consume("open_seq");
+          const args = this.parse_args("close_seq");
+          this.consume("close_seq");
+          return { type: "seq", args };
+        }
+        parse_cat() {
+          this.consume("open_cat");
+          const args = this.parse_args("close_cat");
+          this.consume("close_cat");
+          return { type: "cat", args };
+        }
+      }
+
+      function patternifyTree(tree) {
+        if (tree.type === "cat") {
+          const args = tree.args.map((arg) => patternifyTree(arg));
+          return cat(...args);
+        }
+        if (tree.type === "seq") {
+          const args = tree.args.map((arg) => patternifyTree(arg));
+          return seq(...args);
+        }
+        if (tree.type === "plain") {
+          return tree.value;
+        }
+      }
+
+      const parser = new Parser();
+      let mini = (code) => {
+        const tokens = tokenize(code);
+        const tree = parser.parse(tokens);
+        const pat = patternifyTree(tree);
+        return reify(pat);
+      };
+
       class Pattern {
         constructor(query) {
           this.query = query;
@@ -50,6 +151,7 @@
         });
 
       let repeat = (value) => cycle((a, b) => [{ a, b, value }]);
+      let reify = (value) => (value instanceof Pattern ? value : repeat(value));
 
       let cat = (...values) =>
         cycle((a, b) => {
@@ -125,8 +227,7 @@
       let code2hash = (code) => btoa(encodeURIComponent(code));
 
       const update = async (code) => {
-        console.log("update:");
-        console.log(code);
+        console.log("code:", code);
         const pat = new Function(`return ${code}`)();
         draw(pat);
         window.location.hash = "#" + code2hash(code);
@@ -138,8 +239,7 @@
         urlCode = hash2code(urlCode);
         console.log("loaded code from url!");
       }
-      const initialCode =
-        urlCode || `fast(5, cat('cyan', 'magenta', 'yellow'))`;
+      const initialCode = urlCode || `mini("<cyan magenta yellow>").fast(5)`;
       input.value = initialCode;
       update(initialCode);
 

@@ -411,4 +411,302 @@ Examples
 
 - [fast as a method](https://felixroos.github.io/idlecycles/learn/chapter3.html#Y2F0KCdjeWFuJyUyQyUyMCdtYWdlbnRhJyUyQyUyMCd5ZWxsb3cnKSUwQS5mYXN0KDUp)
 
+## Chapter 4: Mini Notation Parsing
+
+One very distinct feature of tidal is its mini notation. Let's build it from scratch! Most of the logic is heavily inspired by [A Compiler From Scratch](https://www.destroyallsoftware.com/screencasts/catalog/a-compiler-from-scratch).
+
+### Our goal
+
+We want to be able to write stuff like:
+
+```js
+mini("<cyan magenta [yellow white]>").fast(5);
+// which is equivalent to
+cat("cyan", "magenta", seq("yellow", "white")).fast(5);
+```
+
+To be able to do this, we need to parse the mini notation string and somehow construct the appropriate function calls.
+
+### The Tokenizer
+
+We start with a list of valid tokens, which are the smallest meaningful chunks our code can have:
+
+```js
+let token_types = {
+  open_cat: /^\</, // "<"
+  close_cat: /^\>/, // ">"
+  open_seq: /^\[/, // "["
+  close_seq: /^\]/, // "]"
+  plain: /^[a-zA-Z0-9\.]+/, // values
+};
+```
+
+This is a mapping from a human friendly token type to the regex that parses it.
+
+With it, we can tokenize a string like this:
+
+```js
+function next_token(code) {
+  for (let type in token_types) {
+    const match = code.match(token_types[type]);
+    if (match) {
+      return { type, value: match[0] };
+    }
+  }
+  throw new Error(`could not match "${code}"`);
+}
+next_token("<cyan magenta>"); // { type: "open_cat", value: "<" }
+next_token("cyan magenta>"); // { type: "plain", value: "cyan" }
+// ...
+```
+
+Now we can use that function repeatedly to tokenize a whole string:
+
+```js
+function tokenize(code) {
+  let tokens = [];
+  while (code.length > 0) {
+    code = code.trim(); // trim white spaces
+    const token = next_token(code);
+    code = code.slice(token.value.length);
+    tokens.push(token);
+  }
+  return tokens;
+}
+tokenize("<cyan magenta>");
+/* [
+{ type: "open_cat", value: "<" },
+{ type: "plain", value: "cyan" },
+{ type: "plain", value: "magenta" },
+ { type: "close_cat", value: ">" },
+] */
+```
+
+Here, we are taking token by token out of the string, until it is empty.
+That's already a fine tokenizer, let's move on to the parser!
+
+### The Parser
+
+After the code has been tokenized, we can construct a tree. Mini notation supports arbitrary levels of nesting, so we want to support stuff like `<cyan [magenta [white black] yellow]>`. For this example we'd expect something like:
+
+```json
+{
+  "type": "cat",
+  "args": [
+    { "type": "plain", "value": "cyan" },
+    {
+      "type": "seq",
+      "args": [
+        { "type": "plain", "value": "magenta" },
+        {
+          "type": "seq",
+          "args": [
+            { "type": "plain", "value": "white" },
+            { "type": "plain", "value": "black" }
+          ]
+        },
+        { "type": "plain", "value": "yellow" }
+      ]
+    }
+  ]
+}
+```
+
+This might look impossible at first, but it's very doable with some sprinkles of recursion.
+
+Let's start by defining a Parser that is really dumb:
+
+```js
+class Parser {
+  // take tokens, return tree
+  parse(tokens) {
+    this.tokens = tokens;
+    return this.parse_cat();
+  }
+  // parse_cat (wip)
+  parse_cat() {
+    this.consume("open_cat");
+    const a = this.consume("plain");
+    const b = this.consume("plain");
+    this.consume("close_cat");
+    return { type: "cat", args: [a, b] };
+  }
+  consume(type) {
+    // shift removes first element and returns it
+    const token = this.tokens.shift();
+    if (token.type !== type) {
+      throw new Error(`expected token type ${type}, got ${token.type}`);
+    }
+    return token;
+  }
+}
+new Parser().parse("<cyan magenta>");
+```
+
+The last line will return
+
+```json
+{
+  "type": "cat",
+  "args": [
+    {
+      "type": "plain",
+      "value": "cyan"
+    },
+    {
+      "type": "plain",
+      "value": "magenta"
+    }
+  ]
+}
+```
+
+... which is exactly what we want! The problem is that the parser can only parse `cat` with exactly 2 plain values... When we try:
+
+```js
+new Parser().parse("<cyan magenta white>");
+```
+
+.. we get `expected token type close_cat, got plain`, because we have 3 plain values. To match an arbitrary number of values, we can do this:
+
+```js
+class Parser {
+  /* .. */
+  parse_cat() {
+    this.consume("open_cat");
+    let args = [];
+    while (this.tokens[0]?.type !== "close_cat") {
+      args.push(this.consume("plain"));
+    }
+    this.consume("close_cat");
+    return { type: "cat", args };
+  }
+}
+// all of these work now:
+new Parser().parse("<cyan magenta white>");
+new Parser().parse("<cyan magenta>");
+new Parser().parse("<cyan magenta brown red>");
+```
+
+A similar function can be implemented for `seq`:
+
+```js
+class Parser {
+  /* .. */
+  parse(tokens) {
+    this.tokens = tokens;
+    return this.parse_seq();
+  }
+  parse_seq() {
+    this.consume("open_seq");
+    let args = [];
+    while (this.tokens[0]?.type !== "close_seq") {
+      args.push(this.consume("plain"));
+    }
+    this.consume("close_seq");
+    return { type: "seq", args };
+  }
+}
+```
+
+This smells like we could use an abstraction:
+
+```js
+class Parser {
+  /* .. */
+  parse_args(close_type) {
+    const args = [];
+    while (this.tokens[0]?.type !== close_type) {
+      args.push(this.consume("plain"));
+    }
+    return args;
+  }
+  parse_seq() {
+    this.consume("open_seq");
+    const args = this.parse_args("close_seq");
+    this.consume("close_seq");
+    return { type: "seq", args };
+  }
+  parse_cat() {
+    this.consume("open_cat");
+    const args = this.parse_args("close_cat");
+    this.consume("close_cat");
+    return { type: "cat", args };
+  }
+}
+```
+
+We can now tie both functions together with a function that can parse any expression:
+
+```js
+class Parser {
+  /* .. */
+  parse(tokens) {
+    this.tokens = tokens;
+    return this.parse_expr();
+  }
+  parse_expr() {
+    let next = this.tokens[0]?.type;
+    if (next === "open_cat") {
+      return this.parse_cat();
+    } else if (next === "open_seq") {
+      return this.parse_seq();
+    } else if (next === "plain") {
+      return this.consume("plain");
+    }
+    throw new Error(`unexpected token "${this.tokens[0].value}"`);
+  }
+  parse_args(close_type) {
+    const args = [];
+    while (this.tokens[0]?.type !== close_type) {
+      args.push(parse_expr()); // <-- use it here as well!
+    }
+    return args;
+  }
+}
+// this now actually works:
+new Parser().parse("<cyan [magenta [white black] yellow]>");
+```
+
+That's already a basic version of our parser!
+
+### From a Tree to a Pattern
+
+Now having a tree that represents the layers of nesting in our syntax, the last step is to convert it into pattern function calls:
+
+```js
+function patternifyTree(tree) {
+  if (tree.type === "cat") {
+    const args = tree.args.map((arg) => patternifyTree(arg));
+    return cat(...args);
+  }
+  if (tree.type === "seq") {
+    const args = tree.args.map((arg) => patternifyTree(arg));
+    return seq(...args);
+  }
+  if (tree.type === "plain") {
+    return tree.value;
+  }
+}
+```
+
+This is all we need! Now we can tie the whole thing together and call it a day:
+
+```js
+const parser = new Parser();
+let mini = (code) => {
+  const tokens = tokenize(code);
+  const tree = parser.parse(tokens);
+  const pat = patternifyTree(tree);
+  if (pat instanceof Pattern) {
+    return pat;
+  }
+  return repeat(pat); // repeat plain values
+};
+mini("<cyan [magenta white]>");
+// = cat("cyan", seq("magenta", "white"))
+```
+
+And that's a basic implementation of the mini notation! It certainly doesn't cover all features, but it should give you the basic idea.
+
 ## To be continued
