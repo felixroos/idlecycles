@@ -412,7 +412,7 @@ This allows us to conditionally apply a function every n cycles:
 
 This is the end of the third chapter!
 
-Open [chapter3.html](https://felixroos.github.io/idlecycles/learn/chapter2.html) to play with the new syntax. You can evaluate the code with `ctrl+enter` to see the visualization in action!
+Open [chapter3.html](https://felixroos.github.io/idlecycles/learn/chapter3.html) to play with the new syntax. You can evaluate the code with `ctrl+enter` to see the visualization in action!
 
 Examples
 
@@ -444,7 +444,7 @@ let token_types = {
   close_cat: /^\>/, // ">"
   open_seq: /^\[/, // "["
   close_seq: /^\]/, // "]"
-  plain: /^[a-zA-Z0-9\.]+/, // values
+  plain: /^[a-zA-Z0-9\.\#]+/, // values
 };
 ```
 
@@ -717,6 +717,12 @@ mini("<cyan [magenta white]>");
 ```
 
 And that's a basic implementation of the mini notation! It certainly doesn't cover all features, but it should give you the basic idea.
+
+### Chapter 4 REPL
+
+This is the end of the fourth chapter!
+
+Open [chapter4.html](https://felixroos.github.io/idlecycles/learn/chapter4.html) to play with the new syntax. You can evaluate the code with `ctrl+enter` to see the visualization in action!
 
 ## Chapter 5: Operating on Values
 

@@ -39,7 +39,7 @@
         close_cat: /^\>/,
         open_seq: /^\[/,
         close_seq: /^\]/,
-        plain: /^[a-zA-Z0-9\.]+/,
+        plain: /^[a-zA-Z0-9\.\#]+/,
       };
       function next_token(code) {
         for (let type in token_types) {
