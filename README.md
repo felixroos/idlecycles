@@ -883,7 +883,7 @@ let register = (name, fn) => {
 Now we can set our controls with mini notation:
 
 ```js
-s("<0 .25 .5 .75>").h(0.5).fast(7);
+s("<0 .25 .5 .75>").h(0.1).fast(7);
 ```
 
 ![implicitmini](./img/implicitmini.png)
@@ -896,5 +896,14 @@ In the next chapter we will see how we can join multiple Patterns into one, maki
 ### Chapter 5 REPL
 
 Open [chapter5.html](https://felixroos.github.io/idlecycles/learn/chapter5.html) to play with the new syntax. You can evaluate the code with `ctrl+enter` to see the visualization in action!
+
+Examples:
+
+- [shades of blue](https://felixroos.github.io/idlecycles/learn/chapter5.html#bWluaSglMjIlM0NjYWRldCUyMHBvd2RlciUyMCU1QnNreSUyMGNvcm5mbG93ZXIlNUQlM0UlMjIpJTBBLndpdGhWYWx1ZSh2JTNEJTNFdiUyQiUyMmJsdWUlMjIpJTBBLmZhc3QoMTApJTBB)
+- [rainbow](https://felixroos.github.io/idlecycles/learn/chapter5.html#bWluaSglMjIlM0MwJTIwLjElMjAuMiUyMC4zJTIwLjQlMjAuNSUyMC42JTIwLjclMjAuOCUyMC45JTNFJTIyKSUwQS5mYXN0KDkp)
+- [hue rotation](https://felixroos.github.io/idlecycles/learn/chapter5.html#Y2F0KDAlMkMlMjAuMjUlMkMlMjAuNSUyQyUyMC43NSklMEEuZmFzdCg5KSUwQS5hZGQoLjMpLm1vZCgxKQ==)
+- [objects as values](https://felixroos.github.io/idlecycles/learn/chapter5.html#Y2F0KCUwQSUyMCUyMCU3QiUyMGNvbG9yJTNBJTIwJTIyeWVsbG93JTIyJTIwJTdEJTJDJTBBJTIwJTIwJTdCJTIwaCUzQSUyMDAuNSUyQyUyMHMlM0ElMjAwJTIwJTdEJTJDJTBBJTIwJTIwJTdCJTIwaCUzQSUyMDAuNSUyQyUyMHMlM0ElMjAwLjI1JTIwJTdEJTJDJTBBJTIwJTIwJTdCJTIwaCUzQSUyMDAuNSUyQyUyMHMlM0ElMjAwLjUlMjAlN0QlMkMlMEElMjAlMjAlN0IlMjBoJTNBJTIwMC41JTJDJTIwcyUzQSUyMDAuNzUlMjAlN0QlMkMlMEElMjAlMjAlN0IlMjBoJTNBJTIwMC41JTJDJTIwcyUzQSUyMDElMjAlN0QlMEEpLmZhc3QoNyklM0I=)
+- [control functions](https://felixroos.github.io/idlecycles/learn/chapter5.html#cyhjYXQoMCUyQyUyMC4yNSUyQyUyMC41JTJDJTIwLjc1KSkuaCguNSkuZmFzdCg3KQ==)
+- [implicit mini notation](https://felixroos.github.io/idlecycles/learn/chapter5.html#cyglMjIlM0MwJTIwLjI1JTIwLjUlMjAuNzUlM0UlMjIpLmgoMC4xKS5mYXN0KDcp)
 
 ## To be continued
