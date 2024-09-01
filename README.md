@@ -724,6 +724,10 @@ This is the end of the fourth chapter!
 
 Open [chapter4.html](https://felixroos.github.io/idlecycles/learn/chapter4.html) to play with the new syntax. You can evaluate the code with `ctrl+enter` to see the visualization in action!
 
+Examples:
+
+- [nesting](https://felixroos.github.io/idlecycles/learn/chapter4.html#bWluaSglMjIlM0NjeWFuJTIwJTVCbWFnZW50YSUyMHllbGxvdyU1RCUyMCU1QiUyMzAwZmZmZjUwJTIwJTIzZmZmZjAwNTAlMjB3aGl0ZSU1RCUzRSUyMikuZmFzdCg3KQ==)
+
 ## Chapter 5: Operating on Values
 
 Up until now, our functions to modify a pattern were very much concerned with the timespan. Let's look at ways to modify the value of a Hap.
@@ -888,5 +892,9 @@ s("<0 .25 .5 .75>").h(0.5).fast(7);
 
 This is starting to look very usable!
 In the next chapter we will see how we can join multiple Patterns into one, making our language much more expressive.
+
+### Chapter 5 REPL
+
+Open [chapter5.html](https://felixroos.github.io/idlecycles/learn/chapter5.html) to play with the new syntax. You can evaluate the code with `ctrl+enter` to see the visualization in action!
 
 ## To be continued
