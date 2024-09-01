@@ -718,4 +718,169 @@ mini("<cyan [magenta white]>");
 
 And that's a basic implementation of the mini notation! It certainly doesn't cover all features, but it should give you the basic idea.
 
+## Chapter 5: Operating on Values
+
+Up until now, our functions to modify a pattern were very much concerned with the timespan. Let's look at ways to modify the value of a Hap.
+
+### withValue
+
+```js
+let withHap = register("withHap", (fn, pat) =>
+  P((a, b) => pat.query(a, b).map(fn))
+);
+let withValue = register("withValue", (fn, pat) =>
+  pat.withHap((hap) => ({ ...hap, value: fn(hap.value) }))
+);
+```
+
+The function `withHap` lets us edit a hap as we like. `withValue` uses it to run a function on the Hap value specifically, returning a new Hap.
+
+With that, we could put together different shades of blue:
+
+![withValue](./img/withValue.png)
+
+### Color from Numbers
+
+Operating on values gets more exciting when we have numbers to work with. For that matter, let's update the draw logic that sets the rectangle color:
+
+```js
+if (isNaN(Number(value))) {
+  ctx.fillStyle = value; // <- like before
+} else {
+  value = Number(value);
+  ctx.fillStyle = `hsl(${value}turn 50% 50%)`;
+}
+```
+
+Now, if we receive a valid number, we'll use it as the `hue` value in an `hsl` color!
+Here's a rainbow:
+
+![rainbow](./img/rainbow.png)
+
+### Arithmetic
+
+Now that we have numbers, we can do some arithmetic!
+
+```js
+let add = register("add", (n, pat) => pat.withValue((v) => v + n));
+let sub = register("sub", (n, pat) => pat.withValue((v) => v - n));
+let mul = register("mul", (n, pat) => pat.withValue((v) => v * n));
+let div = register("div", (n, pat) => pat.withValue((v) => v / n));
+let mod = register("mod", (n, pat) => pat.withValue((v) => v % n));
+```
+
+Using `add` and `mod`, we could rotate the color palette:
+
+![addA](./img/addA.png)
+
+..changing the value of `add`:
+
+![addB](./img/addB.png)
+
+### Object as Values
+
+Right now, we are only able to pattern the hue. Wouldn't it be nice if we could pattern other properties separately, like hue, saturation, lightness, transparency, rect size, ...? We can do this by adjusting our draw code again:
+
+```js
+const haps = pat.query(0, cycles);
+haps.forEach(({ a, b, value }) => {
+  let { color, h: hue, s: saturation, l: lightness, a: alpha } = value;
+  let fillStyle;
+  if (color) {
+    fillStyle = color;
+  }
+  if (hue !== undefined) {
+    hue = hue * 360;
+    saturation = (saturation ?? 0.5) * 100;
+    lightness = (lightness ?? 0.5) * 100;
+    alpha = alpha ?? 1;
+    fillStyle = `hsla(${hue},${saturation}%,${lightness}%,${alpha})`;
+    console.log("fillStyle", fillStyle);
+  }
+  ctx.fillStyle = fillStyle;
+});
+```
+
+With that in place, our patterns now need to contain objects:
+
+```js
+cat(
+  { color: "yellow" },
+  { h: 0.5, s: 0 },
+  { h: 0.5, s: 0.25 },
+  { h: 0.5, s: 0.5 },
+  { h: 0.5, s: 0.75 },
+  { h: 0.5, s: 1 }
+).fast(7);
+```
+
+![hapObject](./img/hapObject.png)
+
+This notation is rather clunky, we need control functions to the rescue!
+
+### Control Functions
+
+A `control` is basically a shortcut to get a pattern of objects, which means each `Hap` has an object as value.
+
+```js
+let control = (name) =>
+  register(name, (value, pat) => {
+    if (pat) {
+      // e.g. s(.5).h(.1) === h(.1, s(.5))
+      return pat.withValue((v) => Object.assign(v, { [name]: value }));
+    }
+    // e.g. h(cat(.1, .2, .3))
+    if (value instanceof Pattern) {
+      return value.withValue((v) => ({ [name]: v }));
+    }
+    // e.g. h(.3)
+    return repeat({ [name]: value });
+  });
+
+let color = control("color");
+let h = control("h");
+let s = control("s");
+let l = control("l");
+let a = control("a");
+```
+
+Controls are special in the sense that they can be used to create a pattern but also modify a pattern. This allows us to completely avoid curly braces `{}` and keep using functions with method chaining for object values.
+
+![controls](./img/controls.png)
+
+### Implicit Mini Notation
+
+In Chapter 4, we've implemented mini notation. We can modify the register function to treat any string as mini notation like this:
+
+```js
+let register = (name, fn) => {
+  let q = (...args) => {
+    args = args.map((arg) => {
+      if (typeof arg === "string") {
+        return mini(arg);
+      }
+      return arg;
+    });
+    return fn(...args);
+  };
+  Pattern.prototype[name] = function (...args) {
+    return q(...args, this);
+  };
+  return q;
+};
+```
+
+Now we can set our controls with mini notation:
+
+```js
+s("<0 .25 .5 .75>").h(0.5).fast(7);
+```
+
+![implicitmini](./img/implicitmini.png)
+
+### End of Chapter 5
+
+This is starting to look very usable!
+In the next chapter we will see how we can join multiple Patterns into one, making our language much more expressive.
+
 ## To be continued
