@@ -32,132 +32,256 @@
       "
     ></textarea>
     <script>
-      // lib
+      // mini tokenizer / parser
+
+      let token_types = {
+        open_cat: /^\</,
+        close_cat: /^\>/,
+        open_seq: /^\[/,
+        close_seq: /^\]/,
+        plain: /^[a-zA-Z0-9\.\#]+/,
+      };
+      function next_token(code) {
+        for (let type in token_types) {
+          const match = code.match(token_types[type]);
+          if (match) {
+            return { type, value: match[0] };
+          }
+        }
+        throw new Error(`could not match "${code}"`);
+      }
+      console.log(next_token("cyan magenta>")); //
+      function tokenize(code) {
+        let tokens = [];
+        while (code.length > 0) {
+          code = code.trim();
+          const token = next_token(code);
+          code = code.slice(token.value.length);
+          tokens.push(token);
+        }
+        return tokens;
+      }
+
+      class Parser {
+        parse(code) {
+          this.tokens = tokenize(code);
+          return this.parse_expr();
+        }
+        consume(type) {
+          const token = this.tokens.shift();
+          if (token.type !== type) {
+            throw new Error(`expected token type ${type}, got ${token.type}`);
+          }
+          return token;
+        }
+        parse_expr() {
+          let next = this.tokens[0]?.type;
+          if (next === "open_cat") {
+            return this.parse_cat();
+          }
+          if (next === "open_seq") {
+            return this.parse_seq();
+          }
+          if (next === "plain") {
+            return this.consume("plain");
+          }
+          throw new Error(
+            `unexpected token "${this.tokens[0].value}" of type ${this.tokens[0].type}`
+          );
+        }
+        parse_args(close_type) {
+          const args = [];
+          while (this.tokens[0]?.type !== close_type) {
+            args.push(this.parse_expr());
+          }
+          return args;
+        }
+        parse_seq() {
+          this.consume("open_seq");
+          const args = this.parse_args("close_seq");
+          this.consume("close_seq");
+          return { type: "seq", args };
+        }
+        parse_cat() {
+          this.consume("open_cat");
+          const args = this.parse_args("close_cat");
+          this.consume("close_cat");
+          return { type: "cat", args };
+        }
+      }
+
+      function patternifyTree(tree) {
+        if (tree.type === "cat") {
+          const args = tree.args.map((arg) => patternifyTree(arg));
+          return cat(...args);
+        }
+        if (tree.type === "seq") {
+          const args = tree.args.map((arg) => patternifyTree(arg));
+          return seq(...args);
+        }
+        if (tree.type === "plain") {
+          return tree.value;
+        }
+      }
+      let reify = (value) => (value instanceof Pattern ? value : repeat(value));
+
+      const parser = new Parser();
+      let mini = (code) => {
+        const tree = parser.parse(code);
+        const pat = patternifyTree(tree);
+        return reify(pat);
+      };
+
       class Pattern {
         constructor(query) {
           this.query = query;
         }
       }
-      const collect = (callback) =>
-        new Pattern((a, b) => {
-          let events = [];
+      let P = (q) => new Pattern(q);
+
+      let cycle = (callback) =>
+        P((a, b) => {
           a = Math.floor(a);
           b = Math.ceil(b);
+          let bag = [];
           while (a < b) {
-            events = events.concat(callback(a));
+            bag = bag.concat(callback(a, a + 1));
             a++;
           }
-          return events;
+          return bag;
         });
 
-      const pure = (value) =>
-        collect((cycle) => [{ begin: cycle, end: cycle + 1, value }]);
-
-      const reify = (value) => {
+      let repeat = (value) => cycle((a, b) => [{ a, b, value }]);
+      let nest = (value, a, b) => {
         if (value instanceof Pattern) {
-          return value;
+          return value.query(a, b);
         }
-        return pure(value);
+        return [{ a, b, value }];
       };
 
-      let joinLeft = (fn, left, right) => (a, b) => {
-        const l = left(a, b);
-        let bag = [];
-        for (let i in l) {
-          const { begin, end } = l[i];
-          const r = right(begin, end);
-          const value = fn(l[i].value, r[0].value);
-          bag.push({ begin, end, value });
-        }
-        return bag;
-      };
+      let cat = (...values) =>
+        cycle((a, b) => {
+          let value = values[a % values.length];
+          return nest(value, a, b);
+        });
 
-      // squeeze one cycle of right into each event of left
-      let joinSqueezeRight = (left, right, fn) => (a, b) => {
-        const l = left(a, b);
-        let bag = [];
-        for (let i in l) {
-          const d = l[i].end - l[i].begin;
-          const r = right(0, 1); // tbd find out which cycle belongs here..
-          for (let j in r) {
-            const value = fn(l[i].value, r[j].value);
-            const begin = l[i].begin + r[j].begin * d;
-            const end = l[i].begin + r[j].end * d;
-            bag.push({ begin, end, value });
+      let stack = (...values) =>
+        cycle((a, b) => values.map((value) => nest(value, a, b)).flat());
+
+      let seq = (...values) => fast(values.length, cat(...values));
+
+      function joinLeft(pat, args, fn) {
+        return P((a, b) => {
+          let haps = [];
+          // pat = structure source
+          const src = reify(pat).query(a, b);
+          for (let j in src) {
+            const hap = src[j]; // source hap
+            const subargs = args.map((arg) => {
+              if (arg instanceof Pattern) {
+                // query arg within source hap
+                const arghaps = arg
+                  .query(hap.a, hap.b)
+                  .filter((h) => intersects(h, hap));
+                // take first intersection
+                return arghaps[0].value;
+              }
+              return arg;
+            });
+            // construct function call where subargs are not patterns anymore
+            const subhaps = fn(...subargs, pat)
+              .query(hap.a, hap.b)
+              .filter((h) => intersects(h, hap));
+            // concat haps
+            haps = haps.concat(subhaps);
           }
-        }
-        return bag;
-      };
+          return haps;
+        });
+      }
+      function intersects(h1, h2) {
+        return h1.a < h2.b && h2.a < h1.b;
+      }
 
-      let joinSqueezeLeft = (left, right, fn) =>
-        joinSqueezeRight(right, left, fn);
+      function patternifyArgs(fn, args) {
+        // interpret strings as mini notation
+        args = args.map((arg) => {
+          if (typeof arg === "string") {
+            return mini(arg);
+          }
+          return arg;
+        });
+        const pat = args[args.length - 1];
+        const rest = args.slice(0, -1);
+        // short circuit if no extra args or extra args have no pattern
+        if (!rest.length || !rest.find((arg) => arg instanceof Pattern)) {
+          return fn(...args);
+        }
+        return joinLeft(pat, rest, fn);
+      }
 
       let register = (name, fn) => {
-        const q = (...args) => {
-          return new Pattern((a, b) => {
-            if (args[0] instanceof Pattern) {
-              let haps = [];
-              const src = reify(args[args.length - 1]).query(a, b);
-              for (let j in src) {
-                const hap = src[j];
-                const match = args[0].query(hap.begin, hap.end)[0].value;
-                const _args = [match, ...args.slice(1)];
-                const subhaps = fn(..._args).query(hap.begin, hap.end);
-                /*  console.log(
-                  name,
-                  match,
-                  ":",
-                  hap.begin,
-                  hap.end,
-                  "during",
-                  hap.value,
-                  "=",
-                  subhaps
-                ); */
-                haps = haps.concat(subhaps);
-              }
-              return haps;
-            }
-            return fn(...args).query(a, b);
-          });
-        };
-        // const q = fn;
+        let q = (...args) => patternifyArgs(fn, args);
         Pattern.prototype[name] = function (...args) {
           return q(...args, this);
         };
         return q;
       };
 
-      // lib
-      const cat = (...values) =>
-        collect((cycle) => {
-          let pat = reify(values[cycle % values.length]);
-          return pat.query(cycle, cycle + 1);
-        });
-
-      const stack = (...values) =>
-        collect((cycle) => {
-          return values.reduce((acc, v) => {
-            let pat = reify(v);
-            return acc.concat(pat.query(cycle, cycle + 1));
-          }, []);
-        });
-
-      const fast = register(
-        "fast",
-        (fac, pat) =>
-          new Pattern((a, b) =>
-            pat.query(a * fac, b * fac).map(({ begin, end, ...rest }) => ({
-              begin: begin / fac,
-              end: end / fac,
-              ...rest,
-            }))
-          )
+      let fast = register("fast", (factor, pat) =>
+        P((a, b) =>
+          pat.query(a * factor, b * factor).map((hap) => ({
+            a: hap.a / factor,
+            b: hap.b / factor,
+            value: hap.value,
+          }))
+        )
       );
-      const slow = register("slow", (fac, pat) => fast(1 / fac, pat));
 
-      const seq = (...values) => fast(values.length, cat(...values));
-      // draw code
+      let slow = register("slow", (factor, pat) => fast(1 / factor, pat));
+
+      let firstOf = register("firstOf", (n, fn, pat) =>
+        cycle((a, b) => (a % n === 0 ? fn(pat) : pat).query(a, b))
+      );
+      let lastOf = register("lastOf", (n, fn, pat) =>
+        cycle((a, b) => (a % n === n - 1 ? fn(pat) : pat).query(a, b))
+      );
+
+      // value ops
+
+      let withHap = register("withHap", (fn, pat) =>
+        P((a, b) => pat.query(a, b).map(fn))
+      );
+      let withValue = register("withValue", (fn, pat) =>
+        pat.withHap((hap) => ({ ...hap, value: fn(hap.value) }))
+      );
+
+      let add = register("add", (n, pat) => pat.withValue((v) => v + n));
+      let sub = register("sub", (n, pat) => pat.withValue((v) => v - n));
+      let mul = register("mul", (n, pat) => pat.withValue((v) => v * n));
+      let div = register("div", (n, pat) => pat.withValue((v) => v / n));
+      let mod = register("mod", (n, pat) => pat.withValue((v) => v % n));
+
+      let control = (name) =>
+        register(name, (value, pat) => {
+          if (pat) {
+            // e.g. s(.5).h(.1) === h(.1, s(.5))
+            return pat.withValue((v) => Object.assign(v, { [name]: value }));
+          }
+          // e.g. h(cat(.1, .2, .3))
+          if (value instanceof Pattern) {
+            return value.withValue((v) => ({ [name]: v }));
+          }
+          // e.g. h(.3)
+          return repeat({ [name]: value });
+        });
+
+      let color = control("color");
+      let h = control("h");
+      let s = control("s");
+      let l = control("l");
+      let a = control("a");
+      let size = control("size");
+      // draw logic
 
       const canvas = document.getElementById("canvas");
       canvas.width = canvas.clientWidth * window.devicePixelRatio;
@@ -171,70 +295,70 @@
         const x = (normalized) => normalized * width;
         const y = (normalized) => normalized * height;
         ctx.strokeStyle = "black";
-        ctx.lineWidth = 6;
+        ctx.lineWidth = 3;
         const haps = pat.query(0, cycles);
-        haps.forEach(({ begin, end, value }) => {
-          const [nx, nw] = [begin, end - begin];
-          const [ny, nh] = [Math.floor(begin) / cycles, height / cycles];
-          ctx.fillStyle = value;
-          const rect = [x(nx) % width, y(ny), x(nw), nh];
-          ctx.strokeRect(...rect);
+        console.log(haps);
+        haps.forEach(({ a, b, value }) => {
+          let size = 1;
+          if (typeof value === "object") {
+            let { color, h, s, l, a } = value;
+            size = value.size ?? 1;
+            let fillStyle;
+            if (color) {
+              fillStyle = color;
+            }
+            if (h !== undefined) {
+              h = h * 360;
+              s = (s ?? 0.5) * 100;
+              l = (l ?? 0.5) * 100;
+              a = a ?? 1;
+              fillStyle = `hsla(${h},${s}%,${l}%,${a})`;
+            }
+            ctx.fillStyle = fillStyle;
+          }
+          // fallback when not an object
+          else if (typeof value === "string" && isNaN(Number(value))) {
+            ctx.fillStyle = value; // <- like before
+          } else if (!isNaN(Number(value))) {
+            value = Number(value);
+            ctx.fillStyle = `hsl(${value}turn 50% 50%)`;
+          }
+          const [nx, nw] = [a, b - a];
+          const [ny, nh] = [Math.floor(a) / cycles, height / cycles];
+          const rect = [x(nx) % width, y(ny), x(nw) * size, nh * size];
           ctx.fillRect(...rect);
+          ctx.strokeRect(...rect);
         });
       }
 
-      // tool code
-      console.log(
-        `Welcome to idlecycles.. this is still wip.
-      Read https://github.com/felixroos/idlecycles to find out more!
-        `
-      );
-      let ac;
-      document.addEventListener("click", function initAudio() {
-        ac = new AudioContext();
-        ac.resume();
-        document.removeEventListener("click", initAudio);
-      });
-
-      // control
-      let worklet,
-        hz = 44100;
-      const stop = async () => {
-        //
-      };
+      // repl logic
 
       let hash2code = (hash) => decodeURIComponent(atob(hash));
       let code2hash = (code) => btoa(encodeURIComponent(code));
 
       const update = async (code) => {
-        console.log("update:");
-        console.log(code);
-        /* ac = ac || new AudioContext();
-        await ac.resume();
-        stop(); */
+        console.log("code:", code);
         const pat = new Function(`return ${code}`)();
         draw(pat);
-
         window.location.hash = "#" + code2hash(code);
       };
 
-      // ui
       const input = document.getElementById("code");
       let urlCode = window.location.hash.slice(1);
       if (urlCode) {
         urlCode = hash2code(urlCode);
         console.log("loaded code from url!");
       }
-      const initialCode = urlCode || `fast(4, seq('cyan','magenta','yellow'))`;
+      const initialCode =
+        urlCode ||
+        `h("[.1 .2 .3 .4]")
+.s("<.25 .5 .75 1>")`;
       input.value = initialCode;
       update(initialCode);
 
       input.addEventListener("keydown", (e) => {
         if ((e.ctrlKey || e.altKey) && e.key === "Enter") {
           update(input.value);
-        } else if ((e.ctrlKey || e.altKey) && e.code === "Period") {
-          stop();
-          e.preventDefault();
         }
       });
     </script>
