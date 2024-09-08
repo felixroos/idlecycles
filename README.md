@@ -1024,7 +1024,7 @@ function patternifyArgs(fn, args) {
   });
   const pat = args[args.length - 1];
   const rest = args.slice(0, -1);
-  // short circuit if only one arg or other args have no pattern
+  // short circuit if no extra args or extra args have no pattern
   if (!rest.length || !rest.find((arg) => arg instanceof Pattern)) {
     return fn(...args);
   }
