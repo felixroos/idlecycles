@@ -26,6 +26,7 @@ Disclaimer: This is not tidal, so take it with a grain of salt.
 3. [Language Improvements](#chapter-3-language-improvements)
 4. [Mini Notation Parsing](#chapter-4-mini-notation-parsing)
 5. [Operating on Values](#chapter-5-operating-on-values)
+6. [Joining Patterns Together](#chapter-6-joining-patterns-together)
 
 ## Chapter 1: Patterns as Functions of Time
 
