@@ -990,7 +990,7 @@ let joined = left
 /* 
 [ 
   { a: 0, b: 0.5, value: { s: 0, h: .1 } }, 
-  { a: .5, b: 1, value: { s: .5m h: .3 } } 
+  { a: .5, b: 1, value: { s: .5, h: .3 } } 
 ]
 */
 ```
@@ -1013,6 +1013,7 @@ let register = (name, fn) => {
   };
   return q;
 };
+
 function patternifyArgs(fn, args) {
   // interpret strings as mini notation
   args = args.map((arg) => {
