@@ -920,4 +920,188 @@ Examples:
 - [control functions](https://felixroos.github.io/idlecycles/learn/chapter5.html#cyhjYXQoMCUyQyUyMC4yNSUyQyUyMC41JTJDJTIwLjc1KSkuaCguNSkuZmFzdCg3KQ==)
 - [implicit mini notation](https://felixroos.github.io/idlecycles/learn/chapter5.html#cyglMjIlM0MwJTIwLjI1JTIwLjUlMjAuNzUlM0UlMjIpLmgoMC4xKS5mYXN0KDcp)
 
+## Chapter 6: Joining Patterns Together
+
+In Strudel, we can use multiple Patterns in one expression:
+
+```js
+s("[0 .5]").h("<.1 .3>");
+```
+
+This is not possible with our current implementation... If we look at the haps from this pattern, we see the following:
+
+```js
+[
+  // cycle 1
+  { a: 0, b: 0.5, value: { s: 0, h: Pattern } },
+  { a: 0.5, b: 1, value: { s: 0.5, h: Pattern } },
+  // cycle 2
+  { a: 1, b: 1.5, value: { s: 0, h: Pattern } },
+  { a: 1.5, b: 2, value: { s: 0.5, h: Pattern } },
+  // ....
+];
+```
+
+The property `h` ends up as a Pattern, which will confuse our drawing function, because it expects a number. Our desired result would be:
+
+```js
+[
+  // cycle 1
+  { a: 0, b: 0.5, value: { s: 0, h: 0.1 } },
+  { a: 0.5, b: 1, value: { s: 0.5, h: 0.1 } },
+  // cycle 2
+  { a: 1, b: 1.5, value: { s: 0, h: 0.3 } },
+  { a: 1.5, b: 2, value: { s: 0.5, h: 0.3 } },
+  // ....
+];
+```
+
+To get this, we need to somehow combine the 2 Patterns into a single Pattern.
+
+### Structure from the Left
+
+When joining patterns, the structure comes "from the left" by default. This means that the leftmost pattern dictates the temporal structure:
+
+```js
+s("[0 .5]").h("[.1 .2 .3 .4]");
+// [ {s:0, h:.1}, {s:0.5, h:.3} ]
+```
+
+In the first line, the first cycle has 2 Haps, because the leftmost pattern `"[0 .5]"` has 2 Haps. The value of `h` is aligned to that pattern. which is why the first Hap gets `.1` (starting at 0) and the second `.3` (starting at .5).
+
+This is how we could implement this one specific case:
+
+```js
+let left = s("[0 .5]");
+let right = h("[.1 .2 .3 .4]");
+let joined = left
+  .query(0, 1)
+  /* 
+  [ 
+    { a: 0, b: 0.5, value: { s: 0 } }, 
+    { a: .5, b: 1, value: { s: .5 } } 
+  ]
+  */
+  .map((l) => {
+    let r = right.query(l.a, l.b)[0];
+    let value = { ...r.value, ...l.value };
+    return { ...l, value };
+  });
+/* 
+[ 
+  { a: 0, b: 0.5, value: { s: 0, h: .1 } }, 
+  { a: .5, b: 1, value: { s: .5m h: .3 } } 
+]
+*/
+```
+
+The idea is:
+
+1. query the `left` pattern
+2. query the `right` pattern for each hap of the `left` pattern
+3. merge the values
+
+### Patternify Args
+
+To make this work for any function, we can implement a more generalized version of the above in the `register` function:
+
+```js
+let register = (name, fn) => {
+  let q = (...args) => patternifyArgs(fn, args);
+  Pattern.prototype[name] = function (...args) {
+    return q(...args, this);
+  };
+  return q;
+};
+function patternifyArgs(fn, args) {
+  // interpret strings as mini notation
+  args = args.map((arg) => {
+    if (typeof arg === "string") {
+      return mini(arg);
+    }
+    return arg;
+  });
+  const pat = args[args.length - 1];
+  const rest = args.slice(0, -1);
+  // short circuit if only one arg or other args have no pattern
+  if (!rest.length || !rest.find((arg) => arg instanceof Pattern)) {
+    return fn(...args);
+  }
+  return joinLeft(pat, rest, fn); // <- TBD
+}
+```
+
+Here, `patternifyArgs` preprocesses the arguments to the function `fn`, allowing us to join any Patterns if needed.
+To understand what happens here, let's look at how we could call `register` for `h` and `s`:
+
+```js
+let h = register("h", (value, pat) =>
+  pat.withValue((v) => ({ ...v, h: value }))
+);
+let s = register("s", (value, pat) =>
+  pat.withValue((v) => ({ ...v, s: value }))
+);
+```
+
+Our example case `s("[0 .5]").h("[.1 .2 .3 .4]")` could also be written as:
+
+```js
+h("[.1 .2 .3 .4]", s("[0 .5]"));
+// ^ value         ^ pat
+```
+
+Here, our `fn` is `h` and `args` are `["[.1 .2 .3 .4]", s("[0 .5]")]`. The first arg is a string, so it will be parsed as mini notation, turning it into a Pattern. This means we now have 2 Patterns that need to be joined..
+
+### joinLeft
+
+`joinLeft` is called with `pat`, `args` and `fn`. In our example, these are:
+
+- `pat`: `s("[0 .5]")`
+- `args`: `[ mini("[.1 .2 .3 .4]") ]`
+- `fn`: `(value, pat) => pat.withValue((v) => ({ ...v, h: value })))`
+
+With that in mind, let's look at the implementation for `joinLeft`:
+
+```js
+function joinLeft(pat, args, fn) {
+  return P((a, b) => {
+    let haps = [];
+    // pat = structure source
+    const src = reify(pat).query(a, b);
+    for (let j in src) {
+      const hap = src[j]; // source hap
+      const subargs = args.map((arg) => {
+        if (arg instanceof Pattern) {
+          // query arg within source hap
+          const arghaps = arg
+            .query(hap.a, hap.b)
+            .filter((h) => intersects(h, hap));
+          // take first intersection
+          return arghaps[0].value;
+        }
+        return arg;
+      });
+      // construct function call where subargs are not patterns anymore
+      const subhaps = fn(...subargs, pat).query(hap.a, hap.b);
+      // concat haps
+      haps = haps.concat(subhaps);
+    }
+    return haps;
+  });
+}
+function intersects(h1, h2) {
+  return h1.a <= h2.b && h2.a < h1.b;
+}
+```
+
+Like before in our narrow example, we will query each Pattern `arg` once for each source hap to get the value for that point in time.
+This allows us to call `fn` without Pattern args, with the correct value at each point in time.
+Filtering with `intersects` makes sure we get the argument at the right position (`query` might return haps of the same cycle, outside of the given range).
+
+We can now finally use multiple patterns at once:
+
+![leftJoin](./img/leftJoin.png)
+
+![leftJoin2](./img/leftJoin2.png)
+
 ## To be continued
