@@ -213,7 +213,7 @@
         const x = (normalized) => normalized * width;
         const y = (normalized) => normalized * height;
         ctx.strokeStyle = "black";
-        ctx.lineWidth = 6;
+        ctx.lineWidth = 3;
         const haps = pat.query(0, cycles);
         console.log("haps");
         console.log(haps);
@@ -222,8 +222,8 @@
           const [ny, nh] = [Math.floor(a) / cycles, height / cycles];
           ctx.fillStyle = value;
           const rect = [x(nx) % width, y(ny), x(nw), nh];
-          ctx.strokeRect(...rect);
           ctx.fillRect(...rect);
+          ctx.strokeRect(...rect);
         });
       }
 
