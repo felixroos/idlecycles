@@ -1073,7 +1073,9 @@ function joinLeft(pat, args, fn) {
         return arg;
       });
       // construct function call where subargs are not patterns anymore
-      const subhaps = fn(...subargs, pat).query(hap.a, hap.b);
+      const subhaps = fn(...subargs, pat)
+        .query(hap.a, hap.b)
+        .filter((h) => intersects(h, hap));
       // concat haps
       haps = haps.concat(subhaps);
     }
@@ -1081,13 +1083,13 @@ function joinLeft(pat, args, fn) {
   });
 }
 function intersects(h1, h2) {
-  return h1.a <= h2.b && h2.a < h1.b;
+  return h1.a < h2.b && h2.a < h1.b;
 }
 ```
 
 Like before in our narrow example, we will query each Pattern `arg` once for each source hap to get the value for that point in time.
 This allows us to call `fn` without Pattern args, with the correct value at each point in time.
-Filtering with `intersects` makes sure we get the argument at the right position (`query` might return haps of the same cycle, outside of the given range).
+Filtering with `intersects` makes sure we remove haps out of range (`query` might return haps of the same cycle, outside of the given range).
 
 We can now finally use multiple patterns at once:
 
