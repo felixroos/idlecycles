@@ -35,6 +35,8 @@
       // chapter 1 logic:
 
       let cycle = (callback) => (a, b) => {
+        a = Math.floor(a);
+        b = Math.ceil(b);
         let bag = [];
         while (a < b) {
           bag = bag.concat(callback(a, a + 1));

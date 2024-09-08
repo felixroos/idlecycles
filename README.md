@@ -45,6 +45,8 @@ The above example doesn't really do much, so let's implement another pattern tha
 
 ```js
 let repeat = (a, b) => {
+  a = Math.floor(a);
+  b = Math.ceil(b);
   let bag = [];
   while (a < b) {
     bag.push({ a, b: a + 1, value: "X" });
@@ -54,7 +56,7 @@ let repeat = (a, b) => {
 };
 repeat(0, 1); // [{a: 0, b: 1, value: 'X'}]
 repeat(0, 2); // [{a: 0, b: 1, value: 'X'}, {a: 1, b: 2, value: 'X'}]
-repeat(1, 3); // [{a: 1, b: 2, value: 'X'}, {a: 2, b: 3, value: 'X'}]
+repeat(1.5, 2.5); // [{a: 1, b: 2, value: 'X'}, {a: 2, b: 3, value: 'X'}]
 ```
 
 This function will give us one object per whole number within the given time span.
@@ -66,6 +68,8 @@ Ideally, we'd want to choose the value to repeat, so let's make it a higher orde
 
 ```js
 let repeat = (value) => (a, b) => {
+  a = Math.floor(a);
+  b = Math.ceil(b);
   let bag = [];
   while (a < b) {
     bag.push({ a, b: a + 1, value });
@@ -105,6 +109,8 @@ Our repeat function is still a bit boring.. How about switching between differen
 let cat =
   (...values) =>
   (a, b) => {
+    a = Math.floor(a);
+    b = Math.ceil(b);
     let bag = [];
     while (a < b) {
       const value = a % values.length;
@@ -124,6 +130,8 @@ The implementation looks very similar to `repeat`, maybe we should generalize th
 
 ```js
 let cycle = (callback) => (a, b) => {
+  a = Math.floor(a);
+  b = Math.ceil(b);
   let bag = [];
   while (a < b) {
     bag = bag.concat(callback(a, a + 1));
@@ -350,6 +358,8 @@ Luckily, our `cycle` function is the only thing we need to touch:
 let cycle = (callback) =>
   P((a, b) => {
     // ^ the P(...) is new
+    a = Math.floor(a);
+    b = Math.ceil(b);
     let bag = [];
     while (a < b) {
       bag = bag.concat(callback(a, a + 1));
