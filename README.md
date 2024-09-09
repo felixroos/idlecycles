@@ -1122,6 +1122,118 @@ Examples:
 - [Mildly Complex Join](https://felixroos.github.io/idlecycles/learn/chapter6.html#aCglMjIlNUIuMiUyMCU1Qi4yJTIwLjMlMjAuNCU1RCU1RCUyMiklMEEucyglMjIlM0MuMjUlMjAuNSUyMCU1Qi4yNSUyMC45JTVEJTNFJTIyKSUwQS5mYXN0KDUp)
 - [More Complex](https://felixroos.github.io/idlecycles/learn/chapter6.html#c2l6ZSglMjIlM0MzJTIwLjc1JTIwJTVCLjUlMjAuOSU1RCUyMDIlM0UlMjIpJTBBLmgoJTIyJTNDLjIlMjAuMyUyMC4xJTNFJTIyKS5zKC42KS5sKCUyMiU1Qi41JTIwLjglNUQlMjIpJTBBLnJvdGF0ZSglMjIlM0MwJTIwLjElMjAuMiUyMC4zJTIwLjQlMjAuNSUyMC42JTIwLjclMjAuOCUyMC45JTNFJTIyKSUwQS5zdHJva2UoMCklMEEuZmFzdCgxMDIp)
 
+## Chapter 7: Let's make sound
+
+Let's switch things up a bit and use our patterns to make sound.
+
+### Loading and Playing Samples
+
+A lot of fun can be had with samples, let's build a mini sampler using the Web Audio API. This is how we load and play a sound:
+
+```js
+const ac = new AudioContext();
+// fetches the sound file from the given url and creates an AudioBuffer
+function loadSound(url) {
+  return fetch(url)
+    .then((res) => res.arrayBuffer())
+    .then((buf) => ac.decodeAudioData(buf));
+}
+// plays the given AudioBuffer
+function playSound(buffer, time = ac.currentTime, latency = 0.001) {
+  // create source
+  const src = new AudioBufferSourceNode(ac);
+  src.buffer = buffer;
+  // connect to output
+  src.connect(ac.destination);
+  // play sound
+  const begin = time + latency;
+  const end = begin + buffer.duration;
+  src.start(begin);
+  src.stop(end);
+}
+loadSound(
+  "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808bd/BD0000.WAV"
+).then((buffer) => {
+  console.log("sound loaded");
+  // attach click listener when sound is loaded
+  document.body.addEventListener("click", () => playSound(buffer));
+});
+```
+
+The code above is the basic way to load and play a sound. Note that we only have to load the buffer once, but we can play it as often as we like by creating a new `AudioBufferSourceNode` for each playback. An `AudioBufferSourceNode` can not be reused!
+
+You can try this code out by copy pasting it to the browser console, then clicking into the page!
+
+### Loading a Sample Map
+
+We could create a sample map by mapping keys to urls like this:
+
+```js
+// soundMap example: { bd: "<audio-file-url>", hh: "<audio-file-url>", ... }
+async function loadSoundMap(soundMap) {
+  const entries = Object.entries(soundMap);
+  const buffers = await Promise.all(
+    entries.map(([key, url]) => loadSound(url))
+  );
+  // return same format as input soundMap, but with AudioBuffer's instead of urls
+  return Object.fromEntries(
+    buffers.map((buffer, i) => [entries[i][0], buffer])
+  );
+}
+loadSoundMap({
+  bd: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808bd/BD0000.WAV",
+  hh: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808hc/HC00.WAV",
+  cp: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808/CP.WAV",
+}).then((sounds) => {
+  document.body.addEventListener("click", () => {
+    // play random sound on click
+    const keys = Object.keys(sounds);
+    const pick = keys[Math.floor(Math.random() * keys.length)];
+    const buffer = sounds[pick];
+    playSound(buffer);
+  });
+});
+```
+
+### Scheduling Sounds from a Pattern
+
+To play an Array of Haps, we can loop over it and play it at the given time:
+
+```js
+let loadSounds = loadSoundMap({
+  bd: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808bd/BD0000.WAV",
+  hh: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808hc/HC00.WAV",
+  cp: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808/CP.WAV",
+});
+function webAudioTimeout(audioContext, onComplete, startTime, stopTime) {
+  const constantNode = audioContext.createConstantSource();
+  constantNode.start(startTime);
+  constantNode.stop(stopTime);
+  constantNode.onended = () => onComplete();
+}
+
+async function play(pat) {
+  const sounds = await loadSounds;
+  const cycles = 1;
+  let offset = 0;
+  const latency = 0.1;
+  const firstCycle = ac.currentTime;
+  const run = () => {
+    const haps = pat.query(offset, offset + cycles);
+    const time = firstCycle + hap.a + latency;
+    haps.forEach((hap) => playSound(sounds[hap.value.s], time));
+  };
+  run();
+  /* webAudioTimeout(
+    ac,
+    () => {
+      console.log("completed");
+    },
+    ac.currentTime + latency
+  ); */
+}
+```
+
 ## To be continued
 
 ## Old Examples

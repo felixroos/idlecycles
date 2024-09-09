@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html style="height: 100vh">
+  <head>
+    <title>idlecycles chapter 7</title>
+  </head>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      display: flex;
+      background: darkslateblue;
+    "
+  >
+    <canvas
+      id="canvas"
+      style="width: 100%; height: 100%; position: fixed; pointer-events: none"
+    ></canvas>
+    <textarea
+      id="code"
+      spellcheck="false"
+      style="
+        width: 100%;
+        z-index: 1;
+        font-size: 24px;
+        color: black;
+        background: transparent;
+        border: 0;
+        outline: none;
+        padding: 10px;
+      "
+    ></textarea>
+    <script>
+      // mini tokenizer / parser
+
+      let token_types = {
+        open_cat: /^\</,
+        close_cat: /^\>/,
+        open_seq: /^\[/,
+        close_seq: /^\]/,
+        plain: /^[a-zA-Z0-9\.\#]+/,
+      };
+      function next_token(code) {
+        for (let type in token_types) {
+          const match = code.match(token_types[type]);
+          if (match) {
+            return { type, value: match[0] };
+          }
+        }
+        throw new Error(`could not match "${code}"`);
+      }
+      console.log(next_token("cyan magenta>")); //
+      function tokenize(code) {
+        let tokens = [];
+        while (code.length > 0) {
+          code = code.trim();
+          const token = next_token(code);
+          code = code.slice(token.value.length);
+          tokens.push(token);
+        }
+        return tokens;
+      }
+
+      class Parser {
+        parse(code) {
+          this.tokens = tokenize(code);
+          return this.parse_expr();
+        }
+        consume(type) {
+          const token = this.tokens.shift();
+          if (token.type !== type) {
+            throw new Error(`expected token type ${type}, got ${token.type}`);
+          }
+          return token;
+        }
+        parse_expr() {
+          let next = this.tokens[0]?.type;
+          if (next === "open_cat") {
+            return this.parse_cat();
+          }
+          if (next === "open_seq") {
+            return this.parse_seq();
+          }
+          if (next === "plain") {
+            return this.consume("plain");
+          }
+          throw new Error(
+            `unexpected token "${this.tokens[0].value}" of type ${this.tokens[0].type}`
+          );
+        }
+        parse_args(close_type) {
+          const args = [];
+          while (this.tokens[0]?.type !== close_type) {
+            args.push(this.parse_expr());
+          }
+          return args;
+        }
+        parse_seq() {
+          this.consume("open_seq");
+          const args = this.parse_args("close_seq");
+          this.consume("close_seq");
+          return { type: "seq", args };
+        }
+        parse_cat() {
+          this.consume("open_cat");
+          const args = this.parse_args("close_cat");
+          this.consume("close_cat");
+          return { type: "cat", args };
+        }
+      }
+
+      function patternifyTree(tree) {
+        if (tree.type === "cat") {
+          const args = tree.args.map((arg) => patternifyTree(arg));
+          return cat(...args);
+        }
+        if (tree.type === "seq") {
+          const args = tree.args.map((arg) => patternifyTree(arg));
+          return seq(...args);
+        }
+        if (tree.type === "plain") {
+          return tree.value;
+        }
+      }
+      let reify = (value) => (value instanceof Pattern ? value : repeat(value));
+
+      const parser = new Parser();
+      let mini = (code) => {
+        const tree = parser.parse(code);
+        const pat = patternifyTree(tree);
+        return reify(pat);
+      };
+
+      class Pattern {
+        constructor(query) {
+          this.query = query;
+        }
+      }
+      let P = (q) => new Pattern(q);
+
+      let cycle = (callback) =>
+        P((a, b) => {
+          a = Math.floor(a);
+          b = Math.ceil(b);
+          let bag = [];
+          while (a < b) {
+            bag = bag.concat(callback(a, a + 1));
+            a++;
+          }
+          return bag;
+        });
+
+      let repeat = (value) => cycle((a, b) => [{ a, b, value }]);
+      let nest = (value, a, b) => {
+        if (value instanceof Pattern) {
+          return value.query(a, b);
+        }
+        return [{ a, b, value }];
+      };
+
+      let cat = (...values) =>
+        cycle((a, b) => {
+          let value = values[a % values.length];
+          return nest(value, a, b);
+        });
+
+      let stack = (...values) =>
+        cycle((a, b) => values.map((value) => nest(value, a, b)).flat());
+
+      let seq = (...values) => fast(values.length, cat(...values));
+
+      function joinLeft(pat, args, fn) {
+        return P((a, b) => {
+          let haps = [];
+          // pat = structure source
+          const src = reify(pat).query(a, b);
+          for (let j in src) {
+            const hap = src[j]; // source hap
+            const subargs = args.map((arg) => {
+              if (arg instanceof Pattern) {
+                // query arg within source hap
+                const arghaps = arg
+                  .query(hap.a, hap.b)
+                  .filter((h) => intersects(h, hap));
+                // take first intersection
+                return arghaps[0].value;
+              }
+              return arg;
+            });
+            // construct function call where subargs are not patterns anymore
+            const subhaps = fn(...subargs, pat)
+              .query(hap.a, hap.b)
+              .filter((h) => intersects(h, hap));
+            // concat haps
+            haps = haps.concat(subhaps);
+          }
+          return haps;
+        });
+      }
+      function intersects(h1, h2) {
+        return h1.a < h2.b && h2.a < h1.b;
+      }
+
+      function patternifyArgs(fn, args) {
+        // interpret strings as mini notation
+        args = args.map((arg) => {
+          if (typeof arg === "string") {
+            return mini(arg);
+          }
+          return arg;
+        });
+        const pat = args[args.length - 1];
+        const rest = args.slice(0, -1);
+        // short circuit if no extra args or extra args have no pattern
+        if (!rest.length || !rest.find((arg) => arg instanceof Pattern)) {
+          return fn(...args);
+        }
+        return joinLeft(pat, rest, fn);
+      }
+
+      let register = (name, fn) => {
+        let q = (...args) => patternifyArgs(fn, args);
+        Pattern.prototype[name] = function (...args) {
+          return q(...args, this);
+        };
+        return q;
+      };
+
+      let fast = register("fast", (factor, pat) =>
+        P((a, b) =>
+          pat.query(a * factor, b * factor).map((hap) => ({
+            a: hap.a / factor,
+            b: hap.b / factor,
+            value: hap.value,
+          }))
+        )
+      );
+
+      let slow = register("slow", (factor, pat) => fast(1 / factor, pat));
+
+      let firstOf = register("firstOf", (n, fn, pat) =>
+        cycle((a, b) => (a % n === 0 ? fn(pat) : pat).query(a, b))
+      );
+      let lastOf = register("lastOf", (n, fn, pat) =>
+        cycle((a, b) => (a % n === n - 1 ? fn(pat) : pat).query(a, b))
+      );
+
+      // value ops
+
+      let withHap = register("withHap", (fn, pat) =>
+        P((a, b) => pat.query(a, b).map(fn))
+      );
+      let withValue = register("withValue", (fn, pat) =>
+        pat.withHap((hap) => ({ ...hap, value: fn(hap.value) }))
+      );
+
+      let add = register("add", (n, pat) => pat.withValue((v) => v + n));
+      let sub = register("sub", (n, pat) => pat.withValue((v) => v - n));
+      let mul = register("mul", (n, pat) => pat.withValue((v) => v * n));
+      let div = register("div", (n, pat) => pat.withValue((v) => v / n));
+      let mod = register("mod", (n, pat) => pat.withValue((v) => v % n));
+
+      let control = (name) =>
+        register(name, (value, pat) => {
+          if (pat) {
+            // e.g. s(.5).h(.1) === h(.1, s(.5))
+            return pat.withValue((v) => Object.assign(v, { [name]: value }));
+          }
+          // e.g. h(cat(.1, .2, .3))
+          if (value instanceof Pattern) {
+            return value.withValue((v) => ({ [name]: v }));
+          }
+          // e.g. h(.3)
+          return repeat({ [name]: value });
+        });
+
+      let color = control("color");
+      let h = control("h");
+      let s = control("s");
+      let l = control("l");
+      let a = control("a");
+      let size = control("size");
+      let rotate = control("rotate");
+      let stroke = control("stroke");
+      let strokeStyle = control("strokeStyle");
+      // draw logic
+
+      const canvas = document.getElementById("canvas");
+      canvas.width = canvas.clientWidth * window.devicePixelRatio;
+      canvas.height = canvas.clientHeight * window.devicePixelRatio;
+
+      const ctx = canvas.getContext("2d");
+
+      // audio logic
+
+      const ac = new AudioContext();
+      // fetches the sound file from the given url and creates an AudioBuffer
+      function loadSound(url) {
+        return fetch(url)
+          .then((res) => res.arrayBuffer())
+          .then((buf) => ac.decodeAudioData(buf));
+      }
+      // plays the given AudioBuffer
+      function playSound(buffer, time = ac.currentTime, latency = 0.001) {
+        // create source
+        const src = new AudioBufferSourceNode(ac);
+        src.buffer = buffer;
+        // connect to output
+        src.connect(ac.destination);
+        // play sound
+        const begin = time + latency;
+        const end = begin + buffer.duration;
+        src.start(begin);
+        src.stop(end);
+      }
+      // soundMap example: { bd: "<audio-file-url>", hh: "<audio-file-url>", ... }
+      async function loadSoundMap(soundMap) {
+        const entries = Object.entries(soundMap);
+        const buffers = await Promise.all(
+          entries.map(([key, url]) => loadSound(url))
+        );
+        // return same format as input soundMap, but with AudioBuffer's instead of urls
+        return Object.fromEntries(
+          buffers.map((buffer, i) => [entries[i][0], buffer])
+        );
+      }
+      let loadSounds = loadSoundMap({
+        bd: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808bd/BD0000.WAV",
+        hh: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808hc/HC00.WAV",
+        cp: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808/CP.WAV",
+      });
+
+      // repl logic
+
+      let hash2code = (hash) => decodeURIComponent(atob(hash));
+      let code2hash = (code) => btoa(encodeURIComponent(code));
+
+      function webAudioTimeout(audioContext, onComplete, startTime, stopTime) {
+        const constantNode = audioContext.createConstantSource();
+        constantNode.start(startTime);
+        constantNode.stop(stopTime);
+        constantNode.onended = () => onComplete();
+      }
+
+      let pattern;
+      let running = false;
+      async function play(pat) {
+        pattern = pat;
+        const sounds = await loadSounds;
+        const cycles = 1;
+        let offset = 0;
+        const latency = 0.1;
+        const firstCycle = ac.currentTime;
+        if (running) {
+          console.log("already running..");
+          return;
+        }
+        const run = () => {
+          running = true;
+          const begin = offset;
+          const end = offset + cycles;
+          // console.log(begin, end);
+          const haps = pattern.query(offset, offset + cycles);
+          // console.log("haps[0]", haps[0].value.s);
+          haps.forEach((hap) => {
+            const time = firstCycle + hap.a + latency;
+            playSound(sounds[hap.value.s], time);
+          });
+          webAudioTimeout(
+            ac,
+            () => run(),
+            firstCycle + offset,
+            firstCycle + offset + cycles
+          );
+          offset += cycles;
+        };
+        run();
+      }
+
+      const update = async (code) => {
+        console.log("code:", code);
+        const pat = new Function(`return ${code}`)();
+        play(pat);
+        window.location.hash = "#" + code2hash(code);
+      };
+
+      const input = document.getElementById("code");
+      let urlCode = window.location.hash.slice(1);
+      if (urlCode) {
+        urlCode = hash2code(urlCode);
+        console.log("loaded code from url!");
+      }
+      const initialCode = urlCode || `s("[bd hh cp hh]")`;
+      input.value = initialCode;
+      // update(initialCode);
+
+      input.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.altKey) && e.key === "Enter") {
+          update(input.value);
+        }
+      });
+    </script>
+  </body>
+</html>
