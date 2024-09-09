@@ -325,17 +325,15 @@
           buffers.map((buffer, i) => [entries[i][0], buffer])
         );
       }
+
+      // load sounds
       let loadSounds = loadSoundMap({
         bd: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808bd/BD0000.WAV",
         hh: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808hc/HC00.WAV",
         cp: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808/CP.WAV",
       });
 
-      // repl logic
-
-      let hash2code = (hash) => decodeURIComponent(atob(hash));
-      let code2hash = (code) => btoa(encodeURIComponent(code));
-
+      // helper to get a callback for a given audio time
       function webAudioTimeout(audioContext, onComplete, startTime, stopTime) {
         const constantNode = audioContext.createConstantSource();
         constantNode.start(startTime);
@@ -345,38 +343,38 @@
 
       let pattern;
       let running = false;
+      let offset = 0; // keeps track of cycles passed
       async function play(pat) {
         pattern = pat;
         const sounds = await loadSounds;
-        const cycles = 1;
-        let offset = 0;
-        const latency = 0.1;
-        const firstCycle = ac.currentTime;
+        const cycles = 1; // how many cycles we're querying per loop
+        const latency = 0.1; // playback latency
         if (running) {
-          console.log("already running..");
+          // clock is already running
           return;
         }
+        const firstCycle = ac.currentTime;
         const run = () => {
           running = true;
-          const begin = offset;
-          const end = offset + cycles;
-          // console.log(begin, end);
           const haps = pattern.query(offset, offset + cycles);
-          // console.log("haps[0]", haps[0].value.s);
           haps.forEach((hap) => {
+            const buffer = sounds[hap.value.s];
             const time = firstCycle + hap.a + latency;
-            playSound(sounds[hap.value.s], time);
+            playSound(buffer, time);
           });
-          webAudioTimeout(
-            ac,
-            () => run(),
-            firstCycle + offset,
-            firstCycle + offset + cycles
-          );
+          const start = firstCycle + offset;
+          const end = firstCycle + offset + cycles;
+          // schedule next loop
+          webAudioTimeout(ac, run, start, end);
           offset += cycles;
         };
         run();
       }
+
+      // repl logic
+
+      let hash2code = (hash) => decodeURIComponent(atob(hash));
+      let code2hash = (code) => btoa(encodeURIComponent(code));
 
       const update = async (code) => {
         console.log("code:", code);

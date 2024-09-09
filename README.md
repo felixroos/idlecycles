@@ -1195,16 +1195,19 @@ loadSoundMap({
 });
 ```
 
-### Scheduling Sounds from a Pattern
+### A Very Simple Scheduler
 
-To play an Array of Haps, we can loop over it and play it at the given time:
+To play a Pattern, we can loop over it and play it at the given time:
 
 ```js
+// load sounds
 let loadSounds = loadSoundMap({
   bd: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808bd/BD0000.WAV",
   hh: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808hc/HC00.WAV",
   cp: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808/CP.WAV",
 });
+
+// helper to get a callback for a given audio time
 function webAudioTimeout(audioContext, onComplete, startTime, stopTime) {
   const constantNode = audioContext.createConstantSource();
   constantNode.start(startTime);
@@ -1212,25 +1215,34 @@ function webAudioTimeout(audioContext, onComplete, startTime, stopTime) {
   constantNode.onended = () => onComplete();
 }
 
+let pattern;
+let running = false;
+let offset = 0; // keeps track of cycles passed
 async function play(pat) {
+  pattern = pat;
   const sounds = await loadSounds;
-  const cycles = 1;
-  let offset = 0;
-  const latency = 0.1;
+  const cycles = 1; // how many cycles we're querying per loop
+  const latency = 0.1; // playback latency
+  if (running) {
+    // clock is already running
+    return;
+  }
   const firstCycle = ac.currentTime;
   const run = () => {
-    const haps = pat.query(offset, offset + cycles);
-    const time = firstCycle + hap.a + latency;
-    haps.forEach((hap) => playSound(sounds[hap.value.s], time));
+    running = true;
+    const haps = pattern.query(offset, offset + cycles);
+    haps.forEach((hap) => {
+      const buffer = sounds[hap.value.s];
+      const time = firstCycle + hap.a + latency;
+      playSound(buffer, time);
+    });
+    const start = firstCycle + offset;
+    const end = firstCycle + offset + cycles;
+    // schedule next loop
+    webAudioTimeout(ac, run, start, end);
+    offset += cycles;
   };
   run();
-  /* webAudioTimeout(
-    ac,
-    () => {
-      console.log("completed");
-    },
-    ac.currentTime + latency
-  ); */
 }
 ```
 
