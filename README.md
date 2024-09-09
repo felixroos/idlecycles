@@ -1223,7 +1223,10 @@ async function play(pat) {
   const firstCycle = ac.currentTime;
   const run = () => {
     running = true;
-    const haps = pattern.query(offset, offset + cycles);
+    const haps = pattern
+      .query(offset, offset + cycles)
+      // make sure onset happens after offset
+      .filter((hap) => hap.a >= offset);
     haps.forEach((hap) => {
       const buffer = sounds[hap.value.s];
       const time = firstCycle + hap.a + latency;

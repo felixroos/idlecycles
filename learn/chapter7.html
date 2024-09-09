@@ -356,7 +356,9 @@
         const firstCycle = ac.currentTime;
         const run = () => {
           running = true;
-          const haps = pattern.query(offset, offset + cycles);
+          const haps = pattern
+            .query(offset, offset + cycles)
+            .filter((hap) => hap.a >= offset);
           haps.forEach((hap) => {
             const buffer = sounds[hap.value.s];
             const time = firstCycle + hap.a + latency;
