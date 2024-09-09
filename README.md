@@ -1112,6 +1112,16 @@ Check out the `draw` function for how these controls are drawn.. Now we can crea
 
 ![rotate](./img/rotate.png)
 
+### Chapter 6 REPL
+
+Open [chapter6.html](https://felixroos.github.io/idlecycles/learn/chapter6.html) to play with the new joins. You can evaluate the code with `ctrl+enter` to see the visualization in action!
+
+Examples:
+
+- [Simple Pattern Join](https://felixroos.github.io/idlecycles/learn/chapter6.html#aCglMjIlNUIuMSUyMC4yJTIwLjMlMjAuNCU1RCUyMiklMEEucyglMjIlM0MuNSUyMC43NSUyMDElM0UlMjIp)
+- [Mildly Complex Join](https://felixroos.github.io/idlecycles/learn/chapter6.html#aCglMjIlNUIuMiUyMCU1Qi4yJTIwLjMlMjAuNCU1RCU1RCUyMiklMEEucyglMjIlM0MuMjUlMjAuNSUyMCU1Qi4yNSUyMC45JTVEJTNFJTIyKSUwQS5mYXN0KDUp)
+- [More Complex](https://felixroos.github.io/idlecycles/learn/chapter6.html#c2l6ZSglMjIlM0MzJTIwLjc1JTIwJTVCLjUlMjAuOSU1RCUyMDIlM0UlMjIpJTBBLmgoJTIyJTNDLjIlMjAuMyUyMC4xJTNFJTIyKS5zKC42KS5sKCUyMiU1Qi41JTIwLjglNUQlMjIpJTBBLnJvdGF0ZSglMjIlM0MwJTIwLjElMjAuMiUyMC4zJTIwLjQlMjAuNSUyMC42JTIwLjclMjAuOCUyMC45JTNFJTIyKSUwQS5zdHJva2UoMCklMEEuZmFzdCgxMDIp)
+
 ## To be continued
 
 ## Old Examples
