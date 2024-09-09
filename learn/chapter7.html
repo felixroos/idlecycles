@@ -281,6 +281,10 @@
       // audio logic
 
       const ac = new AudioContext();
+      document.addEventListener("click", function init() {
+        ac.resume();
+        document.removeEventListener("click", init);
+      });
       // fetches the sound file from the given url and creates an AudioBuffer
       function loadSound(url) {
         return fetch(url)
