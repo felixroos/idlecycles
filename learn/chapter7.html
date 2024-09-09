@@ -39,7 +39,7 @@
         close_cat: /^\>/,
         open_seq: /^\[/,
         close_seq: /^\]/,
-        plain: /^[a-zA-Z0-9\.\#]+/,
+        plain: /^[a-zA-Z0-9\.\#\-]+/,
       };
       function next_token(code) {
         for (let type in token_types) {
@@ -65,7 +65,12 @@
       class Parser {
         parse(code) {
           this.tokens = tokenize(code);
-          return this.parse_expr();
+          const args = this.parse_args();
+          if (args.length > 1) {
+            // "a b c" === "[a b c]"
+            return { type: "seq", args };
+          }
+          return args[0];
         }
         consume(type) {
           const token = this.tokens.shift();
@@ -331,6 +336,8 @@
         bd: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808bd/BD0000.WAV",
         hh: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808hc/HC00.WAV",
         cp: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808/CP.WAV",
+        jvbass:
+          "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/jvbass/000_01.wav",
       });
 
       // helper to get a callback for a given audio time
@@ -362,7 +369,7 @@
           haps.forEach((hap) => {
             const buffer = sounds[hap.value.s];
             const time = firstCycle + hap.a + latency;
-            playSound(buffer, time);
+            buffer && playSound(buffer, time);
           });
           const start = firstCycle + offset;
           const end = firstCycle + offset + cycles;
@@ -391,7 +398,12 @@
         urlCode = hash2code(urlCode);
         console.log("loaded code from url!");
       }
-      const initialCode = urlCode || `s("[bd hh cp hh]")`;
+      const initialCode =
+        urlCode ||
+        `stack(
+ s("bd hh cp [hh hh]"),
+ s("jvbass - - jvbass - - jvbass -")
+)`;
       input.value = initialCode;
       // update(initialCode);
 
