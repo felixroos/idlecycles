@@ -281,6 +281,9 @@
       let l = control("l");
       let a = control("a");
       let size = control("size");
+      let rotate = control("rotate");
+      let stroke = control("stroke");
+      let strokeStyle = control("strokeStyle");
       // draw logic
 
       const canvas = document.getElementById("canvas");
@@ -294,15 +297,20 @@
         ctx.fillRect(0, 0, width, height);
         const x = (normalized) => normalized * width;
         const y = (normalized) => normalized * height;
-        ctx.strokeStyle = "black";
-        ctx.lineWidth = 3;
+
         const haps = pat.query(0, cycles);
         console.log(haps);
         haps.forEach(({ a, b, value }) => {
-          let size = 1;
+          let rotate = 0,
+            size = 1,
+            stroke = 3,
+            strokeStyle = "black";
           if (typeof value === "object") {
             let { color, h, s, l, a } = value;
-            size = value.size ?? 1;
+            rotate = value.rotate ?? rotate;
+            size = value.size ?? size;
+            stroke = value.stroke ?? stroke;
+            strokeStyle = value.strokeStyle ?? strokeStyle;
             let fillStyle;
             if (color) {
               fillStyle = color;
@@ -315,6 +323,7 @@
               fillStyle = `hsla(${h},${s}%,${l}%,${a})`;
             }
             ctx.fillStyle = fillStyle;
+            ctx.strokeStyle = strokeStyle;
           }
           // fallback when not an object
           else if (typeof value === "string" && isNaN(Number(value))) {
@@ -325,9 +334,21 @@
           }
           const [nx, nw] = [a, b - a];
           const [ny, nh] = [Math.floor(a) / cycles, height / cycles];
-          const rect = [x(nx) % width, y(ny), x(nw) * size, nh * size];
-          ctx.fillRect(...rect);
-          ctx.strokeRect(...rect);
+          let [rx, ry, rw, rh] = [
+            x(nx) % width,
+            y(ny),
+            x(nw) * size,
+            nh * size,
+          ];
+          const [centerX, centerY] = [rx + rw / 2, ry + rh / 2];
+          [rx, ry, rw, rh] = [-rw / 2, -rh / 2, rw, rh];
+          ctx.lineWidth = stroke;
+          ctx.save(); // Save the current context state
+          ctx.translate(centerX, centerY);
+          ctx.rotate(rotate * Math.PI);
+          ctx.fillRect(rx, ry, rw, rh);
+          stroke > 0 && ctx.strokeRect(rx, ry, rw, rh);
+          ctx.restore();
         });
       }
 

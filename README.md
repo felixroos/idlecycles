@@ -1097,6 +1097,21 @@ We can now finally use multiple patterns at once:
 
 ![leftJoin2](./img/leftJoin2.png)
 
+### Bonus: Extra Controls
+
+To flex a little bit with the join feature, let's add more controls:
+
+```js
+let size = control("size");
+let rotate = control("rotate");
+let stroke = control("stroke");
+let strokeStyle = control("strokeStyle");
+```
+
+Check out the `draw` function for how these controls are drawn.. Now we can create some more interesting patterns:
+
+![rotate](./img/rotate.png)
+
 ## To be continued
 
 ## Old Examples
