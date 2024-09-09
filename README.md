@@ -1180,33 +1180,26 @@ async function loadSoundMap(soundMap) {
     buffers.map((buffer, i) => [entries[i][0], buffer])
   );
 }
-loadSoundMap({
-  bd: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808bd/BD0000.WAV",
-  hh: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808hc/HC00.WAV",
-  cp: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808/CP.WAV",
-}).then((sounds) => {
-  document.body.addEventListener("click", () => {
-    // play random sound on click
-    const keys = Object.keys(sounds);
-    const pick = keys[Math.floor(Math.random() * keys.length)];
-    const buffer = sounds[pick];
-    playSound(buffer);
-  });
-});
-```
-
-### A Very Simple Scheduler
-
-To play a Pattern, we can loop over it and play it at the given time:
-
-```js
-// load sounds
 let loadSounds = loadSoundMap({
   bd: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808bd/BD0000.WAV",
   hh: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808hc/HC00.WAV",
   cp: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808/CP.WAV",
 });
+document.body.addEventListener("click", async () => {
+  const sounds = await loadSounds;
+  // play random sound on click
+  const keys = Object.keys(sounds);
+  const pick = keys[Math.floor(Math.random() * keys.length)];
+  const buffer = sounds[pick];
+  playSound(buffer);
+});
+```
 
+### A Very Simple Scheduler
+
+To play a Pattern, we can create a query loop with some Web Audio trickery:
+
+```js
 // helper to get a callback for a given audio time
 function webAudioTimeout(audioContext, onComplete, startTime, stopTime) {
   const constantNode = audioContext.createConstantSource();
