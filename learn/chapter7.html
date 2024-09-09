@@ -13,10 +13,6 @@
       background: darkslateblue;
     "
   >
-    <canvas
-      id="canvas"
-      style="width: 100%; height: 100%; position: fixed; pointer-events: none"
-    ></canvas>
     <textarea
       id="code"
       spellcheck="false"
@@ -280,22 +276,7 @@
           return repeat({ [name]: value });
         });
 
-      let color = control("color");
-      let h = control("h");
       let s = control("s");
-      let l = control("l");
-      let a = control("a");
-      let size = control("size");
-      let rotate = control("rotate");
-      let stroke = control("stroke");
-      let strokeStyle = control("strokeStyle");
-      // draw logic
-
-      const canvas = document.getElementById("canvas");
-      canvas.width = canvas.clientWidth * window.devicePixelRatio;
-      canvas.height = canvas.clientHeight * window.devicePixelRatio;
-
-      const ctx = canvas.getContext("2d");
 
       // audio logic
 
