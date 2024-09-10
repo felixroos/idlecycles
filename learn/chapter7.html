@@ -439,10 +439,12 @@
       let hash2code = (hash) => decodeURIComponent(atob(hash));
       let code2hash = (code) => btoa(encodeURIComponent(code));
 
+      let $1, $2, $3, $4;
+
       const update = async (code) => {
         console.log("code:", code);
-        const pat = new Function(`return ${code}`)();
-        play(pat);
+        new Function(code)();
+        play(stack(...[$1, $2, $3, $4].filter(Boolean)));
         window.location.hash = "#" + code2hash(code);
       };
 
