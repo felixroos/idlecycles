@@ -251,6 +251,9 @@
         Pattern.prototype[name] = function (...args) {
           return q(...args, this);
         };
+        String.prototype[name] = function (...args) {
+          return q(...args, mini(this));
+        };
         return q;
       };
 
