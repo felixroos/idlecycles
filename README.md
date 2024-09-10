@@ -192,7 +192,7 @@ This will have the effect of scaling the time axis of our Haps. This is the visu
 
 ![fast](./img/fast.png)
 
-The trick is to first request scale up our timespan and then scale down the time span of each Hap by the given factor.
+The trick is to first scale up our timespan and then scale down the time span of each Hap by the given factor.
 
 We can implement the opposite version of the function like this:
 
@@ -1241,6 +1241,137 @@ async function play(pat) {
   run();
 }
 ```
+
+### Chapter 8: Failiure
+
+My previous attempt at joining Patterns did not work for some cases. Let's take an example of a function with multiple arguments:
+
+```js
+let euclid = register("euclid", (accents, steps, pat) => /**/);
+```
+
+The implementation is not important here. Let's look at what happens in register:
+
+```js
+// name = 'euclid', fn = (accents, steps, pat) => /**/
+let register = (name, fn) => {
+  let q = (...args) => patternifyArgs(fn, args);
+  Pattern.prototype[name] = function (...args) {
+    return q(...args, this);
+  };
+  return q;
+};
+```
+
+This is how it could be called:
+
+```js
+s("bd").euclid("<3 5>", "<8 16>");
+// which is equivalent to:
+euclid("<3 5>", "<8 16>", s("bd"));
+```
+
+In this case, `euclid` calls `q` with these `args`: `["<3 5>", "<8 16>", s("bd")]`, which will be passed to `patternifyArgs` along with the euclid implementation:
+
+```js
+// fn = (accents, steps, pat) => /**/
+// args = ["<3 5>", "<8 16>", s("bd")]
+function patternifyArgs(fn, args) {
+  // pat = s("bd")
+  const pat = args[args.length - 1];
+  // rest = ["<3 5>", "<8 16>"]
+  const rest = args.slice(0, -1);
+  // short circuit if no extra args or extra args have no pattern
+  if (!rest.length || !rest.find((arg) => arg instanceof Pattern)) {
+    // this would happen if euclid would be called as s("bd").euclid(3, 8)
+    return fn(...args);
+  }
+
+  const [left, ...right] = rest;
+  // left = "<3 5>"
+  // right = ["<8 16>"]
+
+  let mapFn = (...args) => fn(...args, pat);
+  mapFn = curry(mapFn, rest.length);
+  // rest.length = 2
+  // mapFn = (a) => (b) => fn(a, b, s("bd"))
+
+  let acc = left.withValue(mapFn);
+  // "<3 5>".withValue((a) => (b) => fn(a, b, s("bd")))
+  /*
+  [
+   {a:0, b:1, value: (b) => fn(3, b, s("bd")) },
+   {a:1, b:2, value: (b) => fn(5, b, s("bd")) },
+  ]
+  */
+  for (let i in right) {
+    // right[i] = "<8 16>"
+    acc = appLeft(right[i], acc);
+    /*
+    cat(
+      euclid(3, 8, s("bd")),
+      euclid(5, 16, s("bd"))
+    )
+    */
+  }
+  return P((a, b) =>
+    acc
+      .query(a, b)
+      .map((hap_pat) => hap_pat.value.query(a, b))
+      .flat()
+  );
+}
+```
+
+Here's `appLeft`:
+
+```js
+// pat_val = "<8 16>"
+// pat_func = "<3 5>".withValue((a) => (b) => fn(a, b, s("bd")))
+function appLeft(pat_val, pat_func) {
+  pat_val = reify(pat_val);
+  pat_func = reify(pat_func);
+  function query(a, b) {
+    const haps = [];
+    for (const hap_func of pat_func.query(a, b)) {
+      /* 
+        // hap_func is one of
+        {a:0, b:1, value: (b) => euclid(3, b, s("bd")) }
+        {a:1, b:2, value: (b) => euclid(5, b, s("bd")) }
+      */
+      /*
+        "<8 16>".query(0, 1)
+        "<8 16>".query(1, 2)
+      */
+      const hap_vals = pat_val.query(hap_func.a, hap_func.b);
+      // [{a:0, b:1, value:8}, {a:1, b:2, value:16}]
+      for (const hap_val of hap_vals) {
+        if (intersects(hap_func, hap_val)) {
+          const value = hap_func.value(hap_val.value);
+          // value = euclid(3, 8, s("bd")))
+          // value = euclid(3, 16, s("bd")))
+          haps.push({ a: hap_func.a, b: hap_func.b, value });
+        }
+      }
+    }
+    /* 
+      // hap_func is one of
+      {a:0, b:1, value: euclid(3, 8, s("bd")) }
+      {a:1, b:2, value: euclid(5, 16, s("bd")) }
+    */
+    return haps;
+  }
+  return new Pattern(query);
+}
+```
+
+The outcome of `appLeft` is equivalent to:
+
+```js
+cat(s("bd").euclid(3, 8), s("bd").euclid(5, 16));
+```
+
+... which is exactly what we want! How magical
 
 ## To be continued
 
