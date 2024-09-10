@@ -1242,9 +1242,11 @@ async function play(pat) {
 }
 ```
 
-### Chapter 8: Failiure
+## Chapter 8: Failiure
 
-My previous attempt at joining Patterns did not work for some cases. Let's take an example of a function with multiple arguments:
+My previous attempt at joining Patterns did not work for some cases.
+I've now copy pasted a tiny bit of Strudel core code.. Let's break it down..
+Let's take an example of a function with multiple arguments:
 
 ```js
 let euclid = register("euclid", (accents, steps, pat) => /**/);
