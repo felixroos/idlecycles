@@ -277,6 +277,11 @@
         });
 
       let s = control("s");
+      let speed = control("speed");
+
+      const hurry = register("hurry", (factor, pat) =>
+        pat.fast(factor).speed(factor)
+      );
 
       // audio logic
 
@@ -292,15 +297,21 @@
           .then((buf) => ac.decodeAudioData(buf));
       }
       // plays the given AudioBuffer
-      function playSound(buffer, time = ac.currentTime, latency = 0.001) {
+      function playSound(
+        buffer,
+        time = ac.currentTime,
+        latency = 0.001,
+        speed = 1
+      ) {
         // create source
         const src = new AudioBufferSourceNode(ac);
         src.buffer = buffer;
         // connect to output
         src.connect(ac.destination);
+        src.playbackRate.value = Number(speed);
         // play sound
         const begin = time + latency;
-        const end = begin + buffer.duration;
+        const end = begin + buffer.duration / speed;
         src.start(begin);
         src.stop(end);
       }
@@ -333,37 +344,61 @@
         constantNode.onended = () => onComplete();
       }
 
-      let pattern;
-      let running = false;
-      let offset = 0; // keeps track of cycles passed
+      let round = (v, precision = 1000) =>
+        Math.round(v * precision) / precision;
+      let showHap = (hap) =>
+        `${hap.a.toFixed(2)} ${hap.b.toFixed(3)}: ` +
+        Object.entries(hap.value)
+          .map(([key, value]) => `${key}=${value}`)
+          .join(" ");
+
+      let pattern,
+        running,
+        stopped,
+        offset = 0;
       async function play(pat) {
         pattern = pat;
         const sounds = await loadSounds;
-        const cycles = 1; // how many cycles we're querying per loop
+        const cycles = 0.125; // how many cycles we're querying per loop
         const latency = 0.1; // playback latency
         if (running) {
           // clock is already running
           return;
         }
+        stopped = false;
         const firstCycle = ac.currentTime;
         const run = () => {
           running = true;
+          const a = offset,
+            b = round(offset + cycles);
           const haps = pattern
-            .query(offset, offset + cycles)
-            .filter((hap) => hap.a >= offset);
+            .query(a, b)
+            .filter((hap) => hap.a >= a && hap.a < b);
+          if (haps.length) {
+            // console.log(a, b);
+            console.log(haps.map(showHap).join("\n"));
+          }
           haps.forEach((hap) => {
             const buffer = sounds[hap.value.s];
             const time = firstCycle + hap.a + latency;
-            buffer && playSound(buffer, time);
+            buffer && playSound(buffer, time, 0.001, hap.value.speed);
           });
           const start = firstCycle + offset;
           const end = firstCycle + offset + cycles;
           // schedule next loop
-          webAudioTimeout(ac, run, start, end);
-          offset += cycles;
+          if (!stopped) {
+            offset = b;
+            webAudioTimeout(ac, run, start, end);
+          } else {
+            running = false;
+            offset = 0;
+          }
         };
         run();
       }
+      const stop = () => {
+        stopped = true;
+      };
 
       // repl logic
 
@@ -395,6 +430,8 @@
       input.addEventListener("keydown", (e) => {
         if ((e.ctrlKey || e.altKey) && e.key === "Enter") {
           update(input.value);
+        } else if ((e.ctrlKey || e.altKey) && e.key === ".") {
+          stop();
         }
       });
     </script>
