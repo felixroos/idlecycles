@@ -1242,7 +1242,7 @@ async function play(pat) {
 }
 ```
 
-## Chapter 8: Failiure
+## Chapter 8: Failure
 
 My previous attempt at joining Patterns did not work for some cases.
 I've now copy pasted a tiny bit of Strudel core code.. Let's break it down..
