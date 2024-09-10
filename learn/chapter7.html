@@ -20,7 +20,7 @@
         width: 100%;
         z-index: 1;
         font-size: 24px;
-        color: black;
+        color: white;
         background: transparent;
         border: 0;
         outline: none;
@@ -46,7 +46,7 @@
         }
         throw new Error(`could not match "${code}"`);
       }
-      console.log(next_token("cyan magenta>")); //
+
       function tokenize(code) {
         let tokens = [];
         while (code.length > 0) {
@@ -171,36 +171,46 @@
 
       let seq = (...values) => fast(values.length, cat(...values));
 
-      function joinLeft(pat, args, fn) {
-        return P((a, b) => {
-          let haps = [];
-          // pat = structure source
-          const src = reify(pat).query(a, b);
-          for (let j in src) {
-            const hap = src[j]; // source hap
-            const subargs = args.map((arg) => {
-              if (arg instanceof Pattern) {
-                // query arg within source hap
-                const arghaps = arg
-                  .query(hap.a, hap.b)
-                  .filter((h) => intersects(h, hap));
-                // take first intersection
-                return arghaps[0].value;
-              }
-              return arg;
-            });
-            // construct function call where subargs are not patterns anymore
-            const subhaps = fn(...subargs, pat)
-              .query(hap.a, hap.b)
-              .filter((h) => intersects(h, hap));
-            // concat haps
-            haps = haps.concat(subhaps);
-          }
-          return haps;
-        });
-      }
       function intersects(h1, h2) {
         return h1.a < h2.b && h2.a < h1.b;
+      }
+      function hasOnset(a, b, t) {
+        return t >= a && t < b;
+      }
+
+      // this function is shamefully copied from strudel
+      function appLeft(pat_val, pat_func) {
+        pat_val = reify(pat_val);
+        pat_func = reify(pat_func);
+        function query(a, b) {
+          const haps = [];
+          for (const hap_func of pat_func.query(a, b)) {
+            const hap_vals = pat_val.query(hap_func.a, hap_func.b);
+            for (const hap_val of hap_vals) {
+              if (intersects(hap_func, hap_val)) {
+                const value = hap_func.value(hap_val.value);
+                haps.push({ a: hap_func.a, b: hap_func.b, value });
+              }
+            }
+          }
+          return haps;
+        }
+        return new Pattern(query);
+      }
+
+      // this function is shamefully copied from strudel
+      function curry(func, arity = func.length) {
+        const fn = function curried(...args) {
+          if (args.length >= arity) {
+            return func.apply(this, args);
+          } else {
+            const partial = function (...args2) {
+              return curried.apply(this, args.concat(args2));
+            };
+            return partial;
+          }
+        };
+        return fn;
       }
 
       function patternifyArgs(fn, args) {
@@ -217,7 +227,23 @@
         if (!rest.length || !rest.find((arg) => arg instanceof Pattern)) {
           return fn(...args);
         }
-        return joinLeft(pat, rest, fn);
+
+        // this last part is shamefully copied from strudel...
+        const [left, ...right] = rest;
+
+        let mapFn = (...args) => fn(...args, pat);
+        mapFn = curry(mapFn, rest.length);
+
+        let acc = left.withValue(mapFn);
+        for (let i in right) {
+          acc = appLeft(right[i], acc);
+        }
+        return P((a, b) =>
+          acc
+            .query(a, b)
+            .map((hap_pat) => hap_pat.value.query(a, b))
+            .flat()
+        );
       }
 
       let register = (name, fn) => {
@@ -282,6 +308,10 @@
       const hurry = register("hurry", (factor, pat) =>
         pat.fast(factor).speed(factor)
       );
+
+      /* let signal = (callback) => P((a, b) => [{ a, b, value: callback(a, b) }]);
+      let sine = signal((x) => (Math.sin(x) + 1) / 2);
+      let cos = signal((x) => (Math.cos(x) + 1) / 2); */
 
       // audio logic
 
@@ -373,7 +403,7 @@
             b = round(offset + cycles);
           const haps = pattern
             .query(a, b)
-            .filter((hap) => hap.a >= a && hap.a < b);
+            .filter((hap) => hap.a >= a && hap.a < b && hap.value.s !== "-");
           if (haps.length) {
             // console.log(a, b);
             console.log(haps.map(showHap).join("\n"));
