@@ -363,6 +363,7 @@
       // load sounds
       let loadSounds = loadSoundMap({
         bd: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808bd/BD0000.WAV",
+        perc: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/perc/000_perc0.wav",
         hh: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808hc/HC00.WAV",
         cp: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808/CP.WAV",
         jvbass:
@@ -460,11 +461,12 @@
       input.value = initialCode;
       // update(initialCode);
 
-      input.addEventListener("keydown", (e) => {
+      input.addEventListener("keypress", (e) => {
         if ((e.ctrlKey || e.altKey) && e.key === "Enter") {
           update(input.value);
-        } else if ((e.ctrlKey || e.altKey) && e.key === ".") {
+        } else if ((e.ctrlKey || e.altKey) && e.code === "Period") {
           stop();
+          e.preventDefault();
         }
       });
     </script>
