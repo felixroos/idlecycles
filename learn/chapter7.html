@@ -572,6 +572,47 @@
           e.preventDefault();
         }
       });
+      loadSounds.then(() => {
+        const soundList = Object.keys(Object.fromEntries(sounds));
+        console.log("sounds");
+        console.log(`
+   _     _ _                  
+  (_)   | | |                 
+   _  __| | | ___             
+  | |/ _' | |/ _ \\_           
+  | | (_| | |  __/ |          
+  |_|\\__,_|_|\\___| | ___  ___ 
+  / __| | | |/ __| |/ _ \\/ __|
+ | (__| |_| | (__| |  __/\\__ \\
+  \\___|\\__, |\\___|_|\\___||___/
+        __/ |                 
+       |___/                  
+        
+welcome to idle cycles!
+github: https://github.com/felixroos/idlecycles/
+
+mini tutorial:
+
+you can assign to 4 channels:
+$1, $2, $3, $4
+
+chain these functions together:
+${Object.keys(Pattern.prototype).join(" ")}
+
+you can use these sounds with s:
+${soundList.join(" ")}
+
+you can load more sounds with:
+samples("github:tidalcycles/dirt-samples")
+Be aware that this loads a bunch of megabytes
+
+minimal example:
+
+$1 = s("bd hh cp [perc click]")
+
+mini notation supports only [] and <> so far        
+`);
+      });
     </script>
   </body>
 </html>
