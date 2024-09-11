@@ -215,18 +215,21 @@
 
       // flattens a pattern of patterns
       function innerJoin(pat) {
-        return P((a, b) =>
-          pat
-            .query(a, b)
-            .map((hap_pat) => {
-              const candidates = hap_pat.value.query(a, b);
+        return P((a, b) => {
+          // "outer" haps containing Patterns
+          const outerHaps = pat.query(a, b);
+          return outerHaps
+            .map((outerHap) => {
+              const innerHaps = outerHap.value.query(outerHap.a, outerHap.b);
               // make sure we're keeping only the haps that match
-              return candidates.filter(
-                (candidate) => hap_pat.a === candidate.a
+              return innerHaps.filter(
+                (innerHap) =>
+                  outerHap.a === innerHap.a ||
+                  !outerHaps.find((h) => h.a === innerHap.a)
               );
-            })
-            .flat()
-        );
+            }, [])
+            .flat();
+        });
       }
       function outerJoin(pat) {
         return P((a, b) =>
@@ -610,8 +613,7 @@ minimal example:
 
 $1 = s("bd hh cp [perc click]")
 
-mini notation supports only [] and <> so far        
-`);
+mini notation supports only [] and <> so far`);
       });
     </script>
   </body>
