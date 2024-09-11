@@ -137,6 +137,14 @@
         constructor(query) {
           this.query = query;
         }
+        // part is the region of the hap that is active during the query
+        queryWithParts(a, b) {
+          return this.query(a, b).map((hap) => ({
+            ...hap,
+            _a: Math.max(hap.a, a),
+            _b: Math.min(hap.b, b),
+          }));
+        }
       }
       let P = (q) => new Pattern(q);
 
@@ -219,16 +227,11 @@
           // "outer" haps containing Patterns
           const outerHaps = pat.query(a, b);
           return outerHaps
-            .map((outerHap) => {
-              const innerHaps = outerHap.value.query(outerHap.a, outerHap.b);
-              // make sure we're keeping only the haps that match
-              return innerHaps.filter(
-                (innerHap) =>
-                  outerHap.a === innerHap.a ||
-                  !outerHaps.find((h) => h.a === innerHap.a)
-              );
-            }, [])
-            .flat();
+            .map((outerHap) =>
+              outerHap.value.queryWithParts(outerHap.a, outerHap.b)
+            )
+            .flat()
+            .filter((hap) => hap.a === hap._a); // keep haps with onsets
         });
       }
       function outerJoin(pat) {
