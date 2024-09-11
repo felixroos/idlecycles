@@ -213,7 +213,39 @@
         return fn;
       }
 
-      function patternifyArgs(fn, args) {
+      // flattens a pattern of patterns
+      function innerJoin(pat) {
+        return P((a, b) =>
+          pat
+            .query(a, b)
+            .map((hap_pat) => {
+              const candidates = hap_pat.value.query(a, b);
+              // make sure we're keeping only the haps that match
+              return candidates.filter(
+                (candidate) => hap_pat.a === candidate.a
+              );
+            })
+            .flat()
+        );
+      }
+      function outerJoin(pat) {
+        return P((a, b) =>
+          pat
+            .query(a, b)
+            .map((hap_pat) => {
+              const candidates = hap_pat.value.query(a, b);
+              // make sure we're taking the structure from the outside
+              return candidates.map((hap) => ({
+                ...hap,
+                a: hap_pat.a,
+                b: hap_pat.b,
+              }));
+            })
+            .flat()
+        );
+      }
+
+      function patternifyArgs(fn, args, join = innerJoin) {
         // interpret strings as mini notation
         args = args.map((arg) => {
           if (typeof arg === "string") {
@@ -227,23 +259,23 @@
         if (!rest.length || !rest.find((arg) => arg instanceof Pattern)) {
           return fn(...args);
         }
+        let acc;
+        if (rest.length === 1) {
+          // one extra arg = simple case
+          acc = rest[0].withValue((v) => fn(v, pat));
+        } else {
+          // this last part is shamefully copied from strudel...
+          const [left, ...right] = rest;
+          let mapFn = (...args) => fn(...args, pat);
+          mapFn = curry(mapFn, rest.length);
 
-        // this last part is shamefully copied from strudel...
-        const [left, ...right] = rest;
-
-        let mapFn = (...args) => fn(...args, pat);
-        mapFn = curry(mapFn, rest.length);
-
-        let acc = left.withValue(mapFn);
-        for (let i in right) {
-          acc = appLeft(right[i], acc);
+          acc = left.withValue(mapFn);
+          for (let i in right) {
+            acc = appLeft(right[i], acc);
+          }
         }
-        return P((a, b) =>
-          acc
-            .query(a, b)
-            .map((hap_pat) => hap_pat.value.query(a, b))
-            .flat()
-        );
+        // at this point, acc is a pattern of patterns
+        return join(acc);
       }
 
       let register = (name, fn) => {
@@ -278,11 +310,10 @@
 
       // value ops
 
-      let withHap = register("withHap", (fn, pat) =>
-        P((a, b) => pat.query(a, b).map(fn))
-      );
       let withValue = register("withValue", (fn, pat) =>
-        pat.withHap((hap) => ({ ...hap, value: fn(hap.value) }))
+        P((a, b) =>
+          pat.query(a, b).map((hap) => ({ ...hap, value: fn(hap.value) }))
+        )
       );
 
       let add = register("add", (n, pat) => pat.withValue((v) => v + n));
@@ -325,9 +356,17 @@
       });
       // fetches the sound file from the given url and creates an AudioBuffer
       function loadSound(url) {
-        return fetch(url)
-          .then((res) => res.arrayBuffer())
-          .then((buf) => ac.decodeAudioData(buf));
+        return fetch(encodeURI(url)).then(async (res) => {
+          try {
+            if (!res.ok) {
+              throw new Error(`failed loading`);
+            }
+            const buf = await res.arrayBuffer();
+            return ac.decodeAudioData(buf);
+          } catch (err) {
+            throw new Error(`could not load "${url}": ${err.message}`);
+          }
+        });
       }
       // plays the given AudioBuffer
       function playSound(
@@ -348,16 +387,55 @@
         src.start(begin);
         src.stop(end);
       }
+
+      let sounds = new Map();
       // soundMap example: { bd: "<audio-file-url>", hh: "<audio-file-url>", ... }
       async function loadSoundMap(soundMap) {
         const entries = Object.entries(soundMap);
-        const buffers = await Promise.all(
-          entries.map(([key, url]) => loadSound(url))
+        console.log(`loading ${entries.length} sounds...`, soundMap);
+        const loaded = await Promise.all(
+          entries
+            .map(([key, url]) =>
+              loadSound(url)
+                .then((buf) => {
+                  sounds.set(key, buf);
+                  return key;
+                })
+                .catch((err) => {
+                  console.error(err.message);
+                  return;
+                })
+            )
+            .filter(Boolean)
         );
         // return same format as input soundMap, but with AudioBuffer's instead of urls
-        return Object.fromEntries(
-          buffers.map((buffer, i) => [entries[i][0], buffer])
+        console.log(`${loaded.length} sounds loaded: ${loaded.join(" ")}`);
+      }
+
+      async function samples(url) {
+        if (url.startsWith("github:")) {
+          url = `https://raw.githubusercontent.com/${
+            url.split("github:")[1]
+          }/main/`;
+        }
+        if (!url.endsWith("/")) {
+          url += "/";
+        }
+        let base = url;
+        url += "strudel.json";
+
+        const res = await fetch(url);
+        const json = await res.json();
+        const first = Object.fromEntries(
+          Object.entries(json)
+            .filter(([key]) => key !== "_base")
+            .map(([key, urls]) => [
+              key,
+              base + (Array.isArray(urls) ? urls[0] : urls),
+            ])
+          // .slice(0, 10)
         );
+        return loadSoundMap(first);
       }
 
       // load sounds
@@ -392,8 +470,8 @@
         offset = 0;
       async function play(pat) {
         pattern = pat;
-        const sounds = await loadSounds;
-        const cycles = 0.125; // how many cycles we're querying per loop
+        await loadSounds;
+        const cycles = 1; // how many cycles we're querying per loop
         const latency = 0.1; // playback latency
         if (running) {
           // clock is already running
@@ -408,14 +486,21 @@
           const haps = pattern
             .query(a, b)
             .filter((hap) => hap.a >= a && hap.a < b && hap.value.s !== "-");
-          if (haps.length) {
+          if (haps.length && log) {
             // console.log(a, b);
             console.log(haps.map(showHap).join("\n"));
           }
           haps.forEach((hap) => {
-            const buffer = sounds[hap.value.s];
+            if (hap.value.s === "-") {
+              return;
+            }
+            const buffer = sounds.get(hap.value.s);
+            if (!buffer) {
+              console.error(`sound "${hap.value.s}" not found. Is it loaded?`);
+              return;
+            }
             const time = firstCycle + hap.a + latency;
-            buffer && playSound(buffer, time, 0.001, hap.value.speed);
+            playSound(buffer, time, 0.001, hap.value.speed);
           });
           const start = firstCycle + offset;
           const end = firstCycle + offset + cycles;
@@ -439,10 +524,14 @@
       let hash2code = (hash) => decodeURIComponent(atob(hash));
       let code2hash = (code) => btoa(encodeURIComponent(code));
 
-      let $1, $2, $3, $4;
+      let silence = P(() => []);
+
+      let $1, $2, $3, $4, log;
 
       const update = async (code) => {
-        console.log("code:", code);
+        if (log) {
+          console.log("code:", code);
+        }
         new Function(code)();
         play(stack(...[$1, $2, $3, $4].filter(Boolean)));
         window.location.hash = "#" + code2hash(code);
@@ -456,7 +545,7 @@
       }
       const initialCode =
         urlCode ||
-        `stack(
+        `$1 = stack(
  s("bd hh cp [hh hh]"),
  s("jvbass - - jvbass - - jvbass -")
 )`;
