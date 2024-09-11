@@ -225,13 +225,19 @@
       function innerJoin(pat) {
         return P((a, b) => {
           // "outer" haps containing Patterns
+          // const outerHaps = pat.queryWithParts(a, b);
           const outerHaps = pat.query(a, b);
-          return outerHaps
+          const innerHaps = outerHaps
             .map((outerHap) =>
+              // outerHap.value.queryWithParts(outerHap._a, outerHap._b)
               outerHap.value.queryWithParts(outerHap.a, outerHap.b)
             )
-            .flat()
-            .filter((hap) => hap.a === hap._a); // keep haps with onsets
+            .flat();
+          return innerHaps.filter(
+            // keep only haps with onsets
+            // + filter out zero length haps
+            (hap) => hap.a === hap._a && hap._a !== hap._b
+          );
         });
       }
       function outerJoin(pat) {
