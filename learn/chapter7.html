@@ -440,10 +440,22 @@
 
       // load sounds
       let loadSounds = loadSoundMap({
+        "808hc":
+          "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808hc/HC00.WAV",
+        "808mc":
+          "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808mc/MC00.WAV",
+        "808mt":
+          "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808mt/MT00.WAV",
         bd: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808bd/BD0000.WAV",
         perc: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/perc/000_perc0.wav",
         hh: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808hc/HC00.WAV",
         cp: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/808/CP.WAV",
+        click:
+          "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/click/000_click0.wav",
+        coins:
+          "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/coins/coins.wav",
+        pad: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/pad/alien-monolith-pad.wav",
+        jazz: "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/jazz/000_BD.wav",
         jvbass:
           "https://raw.githubusercontent.com/tidalcycles/Dirt-Samples/master/jvbass/000_01.wav",
       });
@@ -471,7 +483,7 @@
       async function play(pat) {
         pattern = pat;
         await loadSounds;
-        const cycles = 1; // how many cycles we're querying per loop
+        const cycles = 0.125; // how many cycles we're querying per loop
         const latency = 0.1; // playback latency
         if (running) {
           // clock is already running
